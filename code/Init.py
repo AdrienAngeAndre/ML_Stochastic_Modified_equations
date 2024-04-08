@@ -87,9 +87,9 @@ def init_Pend(nb_point,h_fixé,Tube,Rand):
     return y0,h,input2,Ex,Vx
 
 
-def create_dataset(type,Rand):
+def create_dataset(Type,Rand):
 
-    if type == "Linear":
+    if Type == "Linear":
         y0,h,input2,Ey,Vy = init_Linear(NB_POINT)
     else:
         y0,h,input2,Ey,Vy = init_Pend(NB_POINT,True,False,Rand)

@@ -13,16 +13,14 @@ def randO2(traj):
 
     samples = distribution.sample((traj,))
 
-    # Déterminer les valeurs associées à chaque échantillon
     values = torch.zeros(traj)
-    for i, sample in enumerate(samples):
-        if sample == 0:
-            values[i] = -torch.sqrt(torch.tensor(3.))
-        elif sample == 1:
-            values[i] = torch.sqrt(torch.tensor(3.))
-        else:
-            values[i] = torch.tensor(0.)
-    return values 
+
+    # Utilisation de masques pour définir les valeurs en une seule opération
+    values[samples == 0] = -torch.sqrt(torch.tensor(3.))
+    values[samples == 1] = torch.sqrt(torch.tensor(3.))
+    values[samples == 2] = torch.tensor(0)
+
+    return values
 
 def init_rand(type,traj):
     if type == "Gaussienne":

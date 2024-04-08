@@ -14,7 +14,6 @@ from Field import JNablaH
 
 BS = 1
 EPOCHS = 5
-func = "Linear"
 if torch.cuda.is_available():
     device = torch.device("cuda")    
 else:

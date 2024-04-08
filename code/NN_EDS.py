@@ -42,13 +42,18 @@ class SchémaAppliqué:
         else:
             self.Modified = True
         self.l = []
+        self.y = 0
 
     # Applique le schéma au champs de vecteur 
     def Applied(self,y0,h,T,traj):
         if self.Modified:
-            self.l = Meth_Mod(self.models,y0,torch.tensor([h]),T,traj,self.Scheme,self.Rand)[1]
+            y,l = Meth_Mod(self.models,y0,torch.tensor([h]),T,traj,self.Scheme,self.Rand)
+            self.y = y 
+            self.l = l
         else:
-            self.l = Meth_Non_Mod(y0,torch.tensor([h]),T,traj,self.Scheme,self.Rand)[1]
+            y,l = Meth_Non_Mod(y0,torch.tensor([h]),T,traj,self.Scheme,self.Rand)
+            self.y = y 
+            self.l = l
     
     #Plot l'évolution de H sur la période sur laquelle le schéma est appliqué 
     def plot_H(self,y0,h):
@@ -72,7 +77,7 @@ class SchémaAppliqué:
         b = torch.tensor([torch.mean(ltrue[:,0]),torch.mean(ltrue[:,1])])
         for h in lh:
             self.Applied(y0,h,T,traj)
-            a = torch.tensor([torch.mean(self.l[:,0]),torch.mean(self.l[:,1])])
+            a = torch.tensor([torch.mean(self.y[:,0]),torch.mean(self.y[:,1])])
             E1.append(h)
             E2.append(torch.norm(a-b).detach())
         plt.plot(E1,E2)
@@ -88,9 +93,10 @@ def main():
     A2 = SchémaAppliqué(func,Scheme,Rand2,None)
     nb_traj = 50000
     h = [0.05,0.1,0.2,0.5]
-    ltrue = Atrue.Applied(torch.tensor([0,1]),0.001,1,nb_traj)
-    A1.plot_err(torch.tensor([0,1]),1,h,ltrue,nb_traj)
-    A2.plot_err(torch.tensor([0,1]),1,h,ltrue,nb_traj)
+    Atrue.Applied(torch.tensor([0,1]),0.001,1,nb_traj)
+    ytrue = Atrue.y
+    A1.plot_err(torch.tensor([0,1]),1,h,ytrue,nb_traj)
+    A2.plot_err(torch.tensor([0,1]),1,h,ytrue,nb_traj)
     plt.plot(h,h)
     plt.xscale("log")
     plt.yscale("log")
