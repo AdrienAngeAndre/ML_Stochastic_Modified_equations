@@ -69,8 +69,8 @@ def H_Linear(y0):
 def f1(y):
     if len(y.shape) > 1:
         result = torch.empty_like(y)
-        result[..., 0] = -(-torch.sin(y[...,0])*y[...,1]**2+2*torch.cos(y[...,0])*torch.cos(y[...,1]))/24
-        result[..., 1] = 2*y[...,1]*torch.cos(y[...,0])/24
+        result[..., 1] = (-torch.sin(y[...,0])*y[...,1]**2+2*torch.cos(y[...,0])*torch.sin(y[...,0]))/24
+        result[..., 0] = -2*y[...,1]*torch.cos(y[...,0])/24
     else:
-        result = torch.tensor([-(-torch.sin(y[0])*y[...,1]**2+2*torch.cos(y[0])*torch.cos(y[1]))/24, 2*y[1]*torch.cos(y[0])/24 ])
+        result = torch.tensor([-2*y[1]*torch.cos(y[0])/24 ,(-torch.sin(y[0])*y[...,1]**2+2*torch.cos(y[0])*torch.sin(y[0]))/24])
     return result

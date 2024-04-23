@@ -9,71 +9,25 @@ from Field import H
 from Schéma import Meth_Non_Mod
 from Schéma import Meth_Mod
 
-
-# Classe représentant l'application d'un schéma numérique 
-class SchémaAppliqué:
-    # Fonction d'Initialisation Field est le champs de vecteur utilisé et Scheme le schéma numérique utilisé 
-    # models corresponds aux MLPs si le champs de vecteur est modifié sinon None 
-    def __init__(self,Field,Scheme,Rand,models):
-        self.Field = Field
-        self.Scheme = Scheme
-        self.Rand = Rand
-        self.models = models
-        if models == None:
-            self.Modified = False
-        else:
-            self.Modified = True
-        self.l = []
-
-    # Applique le schéma au champs de vecteur 
-    def Applied(self,y0,h,T,traj):
-        if self.Modified:
-            self.l = Meth_Mod(self.models,y0,h,T,traj,self.Scheme)[1]
-        else:
-            self.l = Meth_Non_Mod(y0,h,T,traj,self.Scheme)[1]
-    
-    #Plot l'évolution de H sur la période sur laquelle le schéma est appliqué 
-    def plot_H(self,y0,h):
-        v = [H(y0,Type)]
-        for i in range(1,len(self.l)):
-            v.append((torch.mean(-torch.cos(self.l[i][0])+(self.l[i][1])**2/2)).detach())
-        plt.plot([i*h for i in range(len(self.l))],v)
-
-    #Plot l'évolution de la phase sur la période sur laquelle le schéma est appliqué 
-    def plot_Phase(self):
-        a = []
-        b = []
-        for i in range(0,len(self.l)):
-            a.append(torch.mean(self.l[i][0]).detach())
-            b.append(torch.mean(self.l[i][1]).detach())
-        plt.plot(a,b)
-
-    def plot_err(self,y0,T,lh,ltrue,traj):
-        E1 = []
-        E2 = []
-        b = torch.tensor([torch.mean(ltrue[:,0]),torch.mean(ltrue[:,1])])
-        for h in lh:
-            self.Applied(y0,h,T,traj)
-            a = torch.tensor([torch.mean(self.l[:,0]),torch.mean(self.l[:,1])])
-            E1.append(h)
-            E2.append(torch.norm(a-b).detach())
-        plt.plot(E1,E2)
-
-
-
-    
+if torch.cuda.is_available():
+    device = torch.device("cuda")    
+else:
+    device = torch.device("cpu") 
 
 
 Type = "Linear"
 Meth = "MidPoint"
 
 # Plot l'évolution de la Loss 
-def plot_loss(epochs,global_loss):
+def plot_loss(epochs,global_train_loss,global_test_loss):
     plt.xlabel("Epoch")
-    plt.ylabel("Training Loss")
-    plt.title("Evolution de la perte d'entrainement en fonction des périodes")
-    plt.plot(epochs,global_loss)
-    plt.savefig(f'training_loss.png')
+    plt.ylabel("Loss")
+    plt.plot(epochs,global_train_loss,label="Train Loss")
+    plt.plot(epochs,global_test_loss,label="Test Loss")
+    plt.savefig(f'train_loss.png')
+    plt.yscale("log")
+    plt.legend()
+    plt.show()
 
 # Fonction qui plot f1, f2 et f3, pas très adapté au cas stochastique, à refaire 
 def plot_f(y0_train,models,trunc):
@@ -91,9 +45,9 @@ def plot_fi(y0_train,models,i,label):
     l2 = []
     for y0_batch in y0_train: 
         y0_batch = torch.tensor(y0_batch)
-        inp = torch.cat((y0_batch,torch.tensor([0.01])))
+        inp = torch.cat((y0_batch,torch.tensor([0.01]))).to(device)
         l1.append(y0_batch)
-        m = models[i-1](inp).detach()
+        m = models[i-1](inp).to("cpu").detach()
         l2.append(m)
     plt.scatter(l1,l2,label=label)
     return l1
@@ -199,7 +153,6 @@ def plot_fsigma(y0_train,lambd,mu,models):
     plt.ylabel(r'$\sigma_2(x) $')
     plt.legend()
     plt.show()
-
 
 # Fonction qui plot l'Elipse utilisé pour l'initialisation de y0
 def plot_E():
