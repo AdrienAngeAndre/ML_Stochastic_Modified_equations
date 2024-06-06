@@ -46,7 +46,7 @@ class Systeme:
 DIM = 1
 TRUNC = 2
 FUNC1 = "Linearf"
-FUNC2 = "Linears"
+FUNC2 = "LinearSigma"
 SCHEME = "EMaruyamaLinear"
 RAND = "Gaussienne"
 LAMBDA = 1

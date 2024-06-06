@@ -42,7 +42,7 @@ def Tubes(theta,ep1,ep2):
     return ([q,p])
 
 # Fonction d'initialisation pour le pendule 
-def init_Pend(nb_point,h_fixé,Tube,Rand):
+def init_Pend(nb_point,h_fixé,Tube,Sys):
     # 2 types d'initialisations pour y0
     if Tube:
         # Si on ressere le domaine, on genere nb_point dans le tube autour de la variété 
@@ -70,7 +70,7 @@ def init_Pend(nb_point,h_fixé,Tube,Rand):
     # On calcule une approximation de la solution exact y1 en utilisant le schéma non modifié avec un pas plus petit
     x = []
     f = Field("Pendule")
-    s = Schéma("MidPoint",f,f,Rand)
+    s = Schéma("MidPoint",f,f,Sys.Rand)
     for i in range(0,nb_point):
         print("  {} % \r".format(str(int(i)/10).rjust(3)), end="")
         x.append(s.Applied(y0[i],h[i]/10,h[i],NB_TRAJ_INIT,False))
@@ -96,13 +96,13 @@ def init_Additif(nb_point,hf):
     return y0,h,input2,Ex,Vx
 
 # Fonction créant les données et les mettant sous la forme de générateurs
-def create_dataset(nb_point,Type,Rand,dim):
+def create_dataset(nb_point,Sys,dim):
     # On crée les ensembles de données en fonction de notre problème 
-    if FUNC1 == "Linearf" and FUNC2 == "LinearSigma":
-        y0,h,input2,Ey,Vy = init_Linear(nb_point,dim)
-    elif FUNC1 == "Pendule":
-        y0,h,input2,Ey,Vy = init_Pend(nb_point,True,True,Rand)
-    elif FUNC1 == "Additif":
+    if Sys.func1 == "Linearf" and Sys.func2 == "LinearSigma":
+        y0,h,input2,Ey,Vy = init_Linear(nb_point)
+    elif Sys.func1 == "Pendule":
+        y0,h,input2,Ey,Vy = init_Pend(nb_point,True,True,Sys)
+    elif Sys.func1 == "Additif":
         y0,h,input2,Ey,Vy = init_Additif(nb_point,0.1)
 
     # On transforme nos ensembles de données en générateur avec une structure de données de pytorch 

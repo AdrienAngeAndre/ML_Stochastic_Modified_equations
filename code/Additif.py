@@ -24,10 +24,10 @@ def test_addi():
     print_parameters(Sys)
     models1 = create_models(Sys.Dim,Sys.func1,Sys.Trunc)
 
-    y0_train, h_train, input2_train, Ey_train, Vy_train = create_dataset(NB_POINT_TRAIN,Sys.func1,Sys.Rand,Sys.Dim)
+    y0_train, h_train, input2_train, Ey_train, Vy_train = create_dataset(NB_POINT_TRAIN,Sys,Sys.Dim)
     training_set = [y0_train,h_train,input2_train, Ey_train, Vy_train]
 
-    y0_test, h_test, input2_test, Ey_test, Vy_test = create_dataset(NB_POINT_TEST,Sys.func2,Sys.Rand,Sys.Dim)
+    y0_test, h_test, input2_test, Ey_test, Vy_test = create_dataset(NB_POINT_TEST,Sys,Sys.Dim)
     testing_set = [y0_test,h_test,input2_test, Ey_test, Vy_test]
 
     optimizer,all_parameters = create_opt(models1,models1,LR)

@@ -11,36 +11,32 @@ from model import create_models
 from model import train_models,loss_without_train
 from Init import create_dataset
 from Init import create_opt
-from Schéma import Schéma
-from Field import H,ModifiedField,AnalyticModField,Field
-from Plot import plot_fsigma,plot_fi
 from Plot import plot_loss
-from Variables import FUNC1,FUNC2,SCHEME,RAND,DIM,NB_POINT_TRAIN,NB_POINT_TEST,EPOCHS,LAMBDA,print_parameters,LR,TRUNC,Systeme
+from Variables import SYS,NB_POINT_TRAIN,NB_POINT_TEST,EPOCHS,print_parameters,LR
 np.random.seed(42)
 
 
 # Fonction qui test l'entrainement en utilisant les variables spécifiés dans le fichier de commande(Variables)  
 # et trace les courbes attendus 
 def main():
-    Sys = Systeme(DIM,TRUNC,FUNC1,FUNC2,SCHEME,RAND)
-    print_parameters(Sys)
-    models1 = create_models(Sys.DIM,Sys.func1,Sys.TRUNC)
-    models2 = create_models(Sys.DIM,Sys.func2,Sys.TRUNC)
+    print_parameters(SYS)
+    models1 = create_models(SYS.Dim,SYS.func1,SYS.trunc)
+    models2 = create_models(SYS.Dim,SYS.func2,SYS.trunc)
 
 
-    y0_train, h_train, input2_train, Ey_train, Vy_train = create_dataset(NB_POINT_TRAIN,Sys.func1,Sys.Rand,Sys.Dim)
+    y0_train, h_train, input2_train, Ey_train, Vy_train = create_dataset(NB_POINT_TRAIN,SYS,SYS.Dim)
     training_set = [y0_train,h_train,input2_train, Ey_train, Vy_train]
 
-    y0_test, h_test, input2_test, Ey_test, Vy_test = create_dataset(NB_POINT_TEST,Sys.func2,Sys.Rand,Sys.Dim)
+    y0_test, h_test, input2_test, Ey_test, Vy_test = create_dataset(NB_POINT_TEST,SYS,SYS.Dim)
     testing_set = [y0_test,h_test,input2_test, Ey_test, Vy_test]
 
     optimizer,all_parameters = create_opt(models1,models2,LR)
 
-    models1, models2, global_train_loss, global_test_loss, best_loss = train_models(models1, models2, training_set, testing_set, optimizer, Sys)
+    models1, models2, global_train_loss, global_test_loss, best_loss = train_models(models1, models2, training_set, testing_set, optimizer, SYS)
 
     epochs = torch.arange(0, EPOCHS)
 
-    l = loss_without_train(training_set,Sys)
+    l = loss_without_train(training_set,SYS)
     loss_without = torch.ones(EPOCHS)*l
 
     plt.figure()

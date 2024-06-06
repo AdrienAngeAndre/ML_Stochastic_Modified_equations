@@ -25,10 +25,10 @@ def main():
     # On crée le modèle pour fapp 
     models1 = create_models(Sys.DIM,Sys.FUNC1,Sys.TRUNC)
     
-    y0_train, h_train, input2_train, Ey_train, Vy_train = create_dataset(NB_POINT_TRAIN,FUNC1,RAND,DIM)
+    y0_train, h_train, input2_train, Ey_train, Vy_train = create_dataset(NB_POINT_TRAIN,Sys,Sys.Dim)
     training_set = [y0_train,h_train,input2_train, Ey_train, Vy_train]
 
-    y0_test, h_test, input2_test, Ey_test, Vy_test = create_dataset(NB_POINT_TEST,FUNC1,RAND,DIM)
+    y0_test, h_test, input2_test, Ey_test, Vy_test = create_dataset(NB_POINT_TEST,Sys,Sys.Dim)
     testing_set = [y0_test,h_test,input2_test, Ey_test, Vy_test]
 
     optimizer,all_parameters = create_opt(models1,[],LR)

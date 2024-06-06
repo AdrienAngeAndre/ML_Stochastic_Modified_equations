@@ -8,7 +8,7 @@ from Variables import LR,Systeme,print_parameters,EPOCHS
 NB_POINT_TRAIN = 300
 NB_POINT_TEST = 100 
 FUNC1 = "Linearf"
-FUNC2 = "Linearsigma"
+FUNC2 = "LinearSigma"
 RAND = "Gausienne"
 SCHEME = "EMaruyamaLinear"
 DIM = 1
@@ -27,10 +27,10 @@ def main():
     models2 = create_models(Sys.DIM,Sys.func2,Sys.TRUNC)
 
 
-    y0_train, h_train, input2_train, Ey_train, Vy_train = create_dataset(NB_POINT_TRAIN,Sys.func1,Sys.Rand,Sys.Dim)
+    y0_train, h_train, input2_train, Ey_train, Vy_train = create_dataset(NB_POINT_TRAIN,Sys,Sys.Dim)
     training_set = [y0_train,h_train,input2_train, Ey_train, Vy_train]
 
-    y0_test, h_test, input2_test, Ey_test, Vy_test = create_dataset(NB_POINT_TEST,Sys.func2,Sys.Rand,Sys.Dim)
+    y0_test, h_test, input2_test, Ey_test, Vy_test = create_dataset(NB_POINT_TEST,Sys,Sys.Dim)
     testing_set = [y0_test,h_test,input2_test, Ey_test, Vy_test]
 
     optimizer,all_parameters = create_opt(models1,models2,LR)

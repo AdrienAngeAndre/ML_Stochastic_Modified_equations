@@ -176,7 +176,7 @@ def train_models(models1, models2, training_set, testing_set, optimizer, Sys):
             Vy_batch = Vy_batch[0]
             # Appel à la fonction qui calcul la perte 
             training_batch = [y0_batch,h_batch,input2_batch,Ey_batch,Vy_batch]
-            loss_train = train_batch(training_batch,Sché,optimizer,Sys.Rand,seed)
+            loss_train = train_batch(training_batch,Sché,optimizer,Sys,seed)
             epoch_train_losses.append(loss_train)
             ppp += 1
             seed += 1
@@ -194,10 +194,10 @@ def train_models(models1, models2, training_set, testing_set, optimizer, Sys):
     return best_models1,best_models2,global_train_loss,global_test_loss,best_loss
 
 # Entrainement d'un lot 
-def train_batch(training_batch, Schéma, optimizer,Rand,seed):
+def train_batch(training_batch, Schéma, optimizer,Sys,seed):
     # On calcul la perte puis on fait la backpropagation  
     optimizer.zero_grad()
-    loss = compute_loss(training_batch, Schéma, Rand,seed)
+    loss = compute_loss(training_batch, Schéma,Sys,seed)
     loss.backward()
     optimizer.step()
     return loss.item()

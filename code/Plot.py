@@ -121,7 +121,7 @@ def Esperance(Systeme,nb_traj):
 # Plot l'erreur faible pour l'application d'un schéma simple et 
 # d'un Schéma Modifié  
 def plot_Weakerr(Systeme,models1,models2,nb_traj):
-    lh = Systeme.lh 
+    lh = Systeme.LH
     y0 = Systeme.y0 
     T = Systeme.T 
     # On définit un schéma de référence Point Milieu simple
@@ -156,16 +156,16 @@ def plot_lr(Sys):
     # Liste qui stocke la valeur de Loss pour chaque LR 
     loss_lr = []
     # Création du Training set, on garde le même pour chaque LR pour la consistence des résultats 
-    y0_train, h_train, input2_train, Ey_train, Vy_train = create_dataset(NB_POINT_TRAIN,Sys.func1,Sys.Rand,Sys.Dim)
+    y0_train, h_train, input2_train, Ey_train, Vy_train = create_dataset(NB_POINT_TRAIN,Sys,Sys.Dim)
     training_set = [y0_train,h_train,input2_train, Ey_train, Vy_train]
     # Création du Testing set, on garde le même pour chaque LR pour la consistence des résultats 
-    y0_test, h_test, input2_test, Ey_test, Vy_test = create_dataset(NB_POINT_TEST,Sys.func1,Sys.Rand,Sys.Dim)
+    y0_test, h_test, input2_test, Ey_test, Vy_test = create_dataset(NB_POINT_TEST,Sys,Sys.Dim)
     testing_set = [y0_test,h_test,input2_test, Ey_test, Vy_test]
     epochs = torch.arange(0, EPOCHS)
     # Pour chaque LR, on entraine un nouveau modèle sur un optimizer avec ce LR et on observe la Loss 
     for lr in plage_lr:
-        models1 = create_models(Sys.DIM,Sys.func1,Sys.Trunc)
-        models2 = create_models(Sys.DIM,Sys.func2,Sys.Trunc)
+        models1 = create_models(Sys.Dim,Sys.func1,Sys.Trunc)
+        models2 = create_models(Sys.Dim,Sys.func2,Sys.Trunc)
         optimizer,all_parameters = create_opt(models1,models2,lr)
         models1, models2, global_train_loss, global_test_loss, best_loss = train_models(models1, models2, training_set, testing_set, optimizer, Sys)
         loss_lr.append(best_loss)
