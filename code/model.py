@@ -1,40 +1,30 @@
 import torch
 import argparse
 import numpy as np
-import scipy
 import torch.nn as nn
 import torch.optim as optim
 import torch.utils.data as data
 import matplotlib.pyplot as plt
-import time
-from Schéma import param
 from Schéma import init_rand
-from Schéma import PFixe
-from Schéma import Meth_Non_Mod
-from Field import JNablaH
-
-BS = 1
-EPOCHS = 2
-MidPoint = True
-if torch.cuda.is_available():
-    device = torch.device("cuda")    
-else:
-    device = torch.device("cpu") 
+from Schéma import Schéma
+from Field import ModifiedField,Field
+from Variables import BS,EPOCHS,NB_HIDDEN,HIDDEN_SIZE,NB_TRAJ_TRAIN,NB_POINT_TRAIN,DEVICE
 
 ################################### Fonction relevant de la création du modèle ###################################
 
 
-# MLP simple avec pour l'instant 2 hidden layer 
+# Classe répretant un MLP 
 class MLP(nn.Module):
-    # on choisis comme fonction d'activation Tanh pour l'instant 
-    def __init__(self, input_dim, hidden_dim, output_dim):
+    # Classe initialisant les différentes couches d'un MLP 
+    def __init__(self, input_dim, output_dim):
         super().__init__()
-        self.layer1 = nn.Linear(input_dim, hidden_dim)
-        self.hid = nn.Linear(hidden_dim,hidden_dim)
-        self.layer2 = nn.Linear(hidden_dim, output_dim)
+        self.layer1 = nn.Linear(input_dim, HIDDEN_SIZE)
+        self.hid = nn.Linear(HIDDEN_SIZE,HIDDEN_SIZE)
+        self.layer2 = nn.Linear(HIDDEN_SIZE, output_dim)
         self.acti = nn.ReLU()
-        self.dropout = nn.Dropout(p=0.0)
+        self.dropout = nn.Dropout(p=0)
     
+    # Fonction qui permet d'initialiser à la main les poids et les biais 
     def init_W(self,weight,bias):
         if weight != None:
             nn.init.constant_(self.layer1.weight,weight)
@@ -44,152 +34,124 @@ class MLP(nn.Module):
             nn.init.constant_(self.layer2.weight,weight)
             nn.init.constant_(self.layer2.bias,bias)
 
+    # Fonction qui fait la forward 
     def forward(self, x):
         x = self.layer1(x)
         x = self.acti(x)
         x = self.dropout(x)
-        x = self.hid(x)
-        x = self.acti(x)
-        x = self.dropout(x)
-        x = self.hid(x)
-        x = self.acti(x)
+        for _ in range(NB_HIDDEN):
+            x = self.hid(x)
+            x = self.acti(x)
+            x = self.dropout(x)
         x = self.layer2(x)
         return x
 
-
-# Fonction qui permet de créer 
-def create_models(y_dim,func):
+# Fonction qui permet de créer les différents MLP pour un champs de vecteur 
+# et les stockes dans une liste
+def create_models(y_dim,func,trunc):
     models = []
-    if func == "Linear":
-        models.append(MLP(y_dim+1, 1000, y_dim))
-        models.append(MLP(y_dim+1, 1000, y_dim))
-        models.append(MLP(y_dim+1, 1000, y_dim))
-        models.append(MLP(y_dim+1, 1000, y_dim))
-        models.append(MLP(y_dim+1, 1000, y_dim))
-        models.append(MLP(y_dim+1, 1000, y_dim))
-    elif func == "Other":
-        models.append([MLP(1+1, 1000, 1),MLP(1+1, 1000, 1)])
-        models.append([MLP(1+1, 1000, 1),MLP(1+1, 1000, 1)])
-        models.append([MLP(1+1, 1000, 1),MLP(1+1, 1000, 1)])
-        models.append([MLP(1+1, 1000, 1),MLP(1+1, 1000, 1)])
+    if func == "Additif":
+        # Dans le cadre du bruit additif simple on a besoin d'un seul MLP 
+        models.append(MLP(y_dim+1, y_dim))
     else:
-        models.append(MLP(y_dim, 100, y_dim))
-        models.append(MLP(y_dim+1, 100, y_dim))
+        # On a besoin de N MLPs en fonction de l'ordre auquel on tronque la série 
+        for i in range(trunc):
+            models.append(MLP(y_dim, y_dim))
+        # On besoin d'un MLP en plus pour le reste, la dimension d'entrée prends en compte y et h 
+        models.append(MLP(y_dim+1, y_dim))
     return models
 
 
 ################################### Fonction relevant de l'entrainement du modèle ###################################
 
 
-def X_Linear(train_batch,models,traj,Rand):
-    y0_batch = train_batch[0]
-    h_batch = train_batch[1]
-    input2_batch = train_batch[2]
-    dim = np.shape(y0_batch)[-1]
-    lambd, mu = param("Linear")
-    rand = init_rand(Rand,traj)
-    #f_mod = y0_batch * lambd + h_batch * models[0](input2_batch) + h_batch**2 * models[1](input2_batch) + h_batch**3 * models[2](input2_batch) 
-    #sigma_mod =  torch.sqrt(torch.abs(y0_batch**2 * mu**2 + h_batch * models[3](input2_batch) + h_batch**2 * models[4](input2_batch) + h_batch**3 * models[5](input2_batch)))
-    #x = y0_batch * torch.ones(traj,dim) + h_batch * f_mod * torch.ones(traj,dim) + torch.sqrt(h_batch) * rand.unsqueeze(-1) * sigma_mod
-    if(MidPoint):
-        y1 = PFixe(y0_batch,h_batch,rand,models,traj,True,"Linear",False)
-        #y1 = Meth_Non_Mod(y0_batch,h_batch/10,h_batch,traj,"MidPoint",Rand,"Pendule")[0]
-        input22 = torch.cat(((y0_batch+y1.squeeze(0))/2,h_batch*torch.ones(traj,1)),dim=1).to(device)
-        x = (y0_batch + y1)/2*torch.ones(10000) + h_batch*((y0_batch + y1)/2*lambd+h_batch*models[0](input22)+h_batch**2*models[1](input22)+h_batch**3*models[2](input22))*torch.ones(10000)+torch.sqrt(h_batch)*torch.sqrt(torch.abs(((y0_batch + y1)/2)**2*mu**2+h_batch*models[3](input22)+h_batch**2*models[4](input22)+h_batch**3*models[5](input22)))*torch.randn(10000) 
-    else:
-        x = y0_batch*torch.ones(1000000) + h_batch*(y0_batch*lambd+h_batch*models[0](input2_batch.to(device)).to("cpu")+h_batch**2*models[1](input2_batch.to(device)).to("cpu")+h_batch**3*models[2](input2_batch.to(device)).to("cpu"))*torch.ones(1000000)+torch.sqrt(h_batch)*torch.sqrt(torch.abs(y0_batch**2*mu**2+h_batch*models[3](input2_batch.to(device)).to("cpu")+h_batch**2*models[4](input2_batch.to(device)).to("cpu")+h_batch**3*models[5](input2_batch.to(device)).to("cpu")))*rand
-    x = x.unsqueeze(-1)
+# Fonction qui calcul N trajectoires d'un pas du schéma modifié avec l'état actuelle 
+# des MLPs 
+def X(y0_batch,h_batch,Rand,Schéma):
+    # On crée le xi 
+    rand = init_rand(Rand,NB_TRAJ_TRAIN)
+    # On applique le schéma numérique modifié 
+    x = Schéma.step(y0_batch,h_batch,rand)
     return x 
 
-def X_SSV(train_batch,models,traj,Rand):
-    y0_batch = train_batch[0]
-    h_batch = train_batch[1]
-    input2_batch = train_batch[2]
-    rand = init_rand(Rand,traj)
-    p1 = y0_batch[:,1].unsqueeze(-1) * torch.ones(traj)  + h_batch*(-torch.sin(y0_batch[:,0].unsqueeze(-1))/2 + h_batch * models[0][1](input2_batch) + h_batch**2 * models[1][1](input2_batch))*torch.ones(traj) + torch.sqrt(h_batch) * (-torch.sin(y0_batch[:,0].unsqueeze(-1))/2 + h_batch * models[2][1](input2_batch) + h_batch**2 * models[3][1](input2_batch)) * rand
-    i = torch.cat((p1.unsqueeze(-1),input2_batch[:,],(h_batch*torch.ones(traj)).unsqueeze(-1)),dim=2)
-    q = y0_batch[:,0].unsqueeze(-1) * torch.ones(traj) + h_batch*(p1 + h_batch* models[0][0](i).squeeze(2) + h_batch**2 * models[1][0](i).squeeze(2)) + torch.sqrt(h_batch) * (p1 + h_batch * models[2][0](i).squeeze(2) + h_batch**2 * models[3][0](i).squeeze(2)) * rand
-    i = torch.cat((q.unsqueeze(-1),(h_batch*torch.ones(traj)).unsqueeze(-1)),dim=2)
-    p = p1 + h_batch*(-torch.sin(q)/2 + h_batch * models[0][1](i).squeeze(2) + h_batch**2 * models[1][1](i).squeeze(2))*torch.ones(traj) + torch.sqrt(h_batch) * (-torch.sin(q)/2 + h_batch * models[2][1](i).squeeze(2) + h_batch**2 * models[3][1](i).squeeze(2)) * rand
-    x = torch.stack((q, p))
-    return x
-
-def X_Pendule(train_batch,models,traj,Rand):
-    y0_batch = train_batch[0]
-    h_batch = train_batch[1]
-    input2_batch = train_batch[2]
-    # rand = (2*torch.randint(0, 2, size=(nb_trajectories,))-1)
-    rand = init_rand(Rand,traj)
-    # rand = torch.randn(nb_trajectories)
+# Fonction qui calcul N trajectoires pour le bruit additif
+def X_addi(y0_batch,h_batch,Schéma,Rand,seed):
+    models = Schéma.f.mod
+    torch.random.manual_seed(seed)
+    rand = init_rand(Rand,NB_TRAJ_TRAIN)
     r = rand.unsqueeze(-1)
-    if(MidPoint):
-        y1 = PFixe(y0_batch,h_batch,rand,models,traj,True,"Pendule",True)
-        y = ((y0_batch.unsqueeze(-1) * torch.ones(traj)).mT)
-        h = ((h_batch.unsqueeze(-1) * torch.ones(traj)).mT)
-        input21 = ((y + y1)/2).to(device)
-        input22 = torch.cat(((y+y1)/2,h),dim=2).to(device)
-        x = y + (h+np.sqrt(h)*r) * (JNablaH((y + y1)/2) + h*models[0](input21).to("cpu") + h**2*models[1](input22).to("cpu"))
-    else:
-        input21 = y0_batch.to(device)
-        input22 = input2_batch.to(device)
-        x = y0_batch + (h_batch+np.sqrt(h_batch)*r) * (JNablaH(y0_batch) + h_batch*models[0](input21).to("cpu") + h_batch**2*models[1](input22).to("cpu"))
+    input2_batch = torch.cat((y0_batch,h_batch.repeat(NB_TRAJ_TRAIN,1)),1)
+    input22 = input2_batch.to(DEVICE)
+    x = y0_batch-models[0](input22).to("cpu")*h_batch*y0_batch + torch.sqrt(2*h_batch)*r
     return x
 
-
-def compute_MSE(train_batch,models,function,Rand):
-    # on calcul d'abords f1 et Ra grâce à une première passe sur les 2 MLP, f1 prends en entré y0 et Ra y0 et h
-    # On calcul ensuite la valeur en appliquant la méthode d'EUler à la troncature fapp
-    # On en déduit la MSE
+# Calcule l'erreur entre les valeurs prédites et calculés avec notre 
+# fonction de perte  
+def compute_loss(train_batch,Schéma,Sys,seed):
+    # Tous les lots 
+    y0_batch = train_batch[0]
     h_batch = train_batch[1]
-    Ey = train_batch[3]
-    Vy = train_batch[4]
-    nb_trajectories = 1000000
-    if function == "Linear":
-        x = X_Linear(train_batch,models,nb_trajectories,Rand)
-    elif function == "Other":
-        x = X_SSV(train_batch,models,nb_trajectories,Rand)
-    else:
-        x = X_Pendule(train_batch,models,nb_trajectories,Rand)
-    # Calcul des moyennes et des variances
-    if MidPoint:
-        y_hat1 = torch.mean(x,dim=1) / h_batch**2
-    else:
-        y_hat1 = torch.mean(x[0])/ h_batch**2
-    if np.shape(Vy)[-1] == 1:
-        y_hat2 = torch.var(x) / h_batch**2
-    else:
-        if MidPoint:
-            y_hat2 = torch.cov(x[0].T) / h_batch**2
+    Ey_batch = train_batch[3]
+    Vy_batch = train_batch[4]
+    loss = 0
+    # On gère le ici le mini batching cad traiter un lot de plusieurs données avant la backpropagation plutot qu'une seule 
+    # Normalement on vectorise sur pytorch mais ici rien que la génération de trajectoires sur une seule donnée est couteux 
+    # en mémoire ainsi on ne peux pas vectoriser et traiter d'un seule cout la génération de trajectoires sur un lot entier de données 
+    # Donc on traite les données du lot 1 par 1 à la différence que l'on fait la backpropagation seulement après avoir traiter le lot entier
+    for i in range(BS):
+        # Si on traite par lot les tenseurs ont une dimension suplémentaire 
+        if BS == 1:
+            y0 = y0_batch[0]
+            h = h_batch[0]
+            Ey = Ey_batch[0]
+            Vy = Vy_batch[0]
         else:
-            y_hat2 = torch.cov(x.T) / h_batch**2
-    loss = torch.mean(torch.mean(torch.abs(y_hat1 - Ey), dim=1)) + torch.mean(torch.mean(torch.abs(y_hat2 - Vy)))
-    return loss
+            y0 = y0_batch[i]
+            h = y0_batch[i]
+            Ey = Ey_batch[i]
+            Vy = Vy_batch[i]
+        y0 = y0.to(DEVICE)
+        h = h.to(DEVICE)
+        # On calcul un N trajectoires d'un pas du schéma numérique  
+        if Sys.Scheme == "Additif":
+            x = X_addi(y0,h,Schéma,Sys.Rand,seed)
+            y_hat1 = torch.mean(x).unsqueeze(-1).unsqueeze(-1)
+        else:
+            x = X(y0,h,Sys.Rand,Schéma)
+            y_hat1 = torch.mean(x.to("cpu"),dim=0)/ h_batch[0]**2
+        # On va distinguer les cas de la dimension 1 ou plus à cause des fonctions 
+        # internes à pytorch qui sont différentes 
+        if np.shape(Vy)[-1] == 1:
+            if Sys.Scheme == "Additif":
+                y_hat2 = torch.var(x)
+            else:
+                y_hat2 = torch.var(x.to("cpu")) / h_batch[0]**2
+        else:
+            y_hat2 = torch.cov(x.T.to("cpu")) / h_batch**2
+        Ey = Ey.to("cpu")
+        Vy = Vy.to("cpu")
+        # Fonction de perte, la normalisation est directement dans les y_hat et Ey, Vy 
+        loss += torch.mean(torch.abs(y_hat1 - Ey)) + torch.mean(torch.abs(y_hat2 - Vy))
+    return loss/BS
 
-def train_models(models, training_set, testing_set, optimizer, function, Rand):
+# Fonction d'entrainement globale du réseaux de neurones 
+def train_models(models1, models2, training_set, testing_set, optimizer, Sys):
     epochs = torch.arange(0, EPOCHS)
-    # Pour chaque période, on parcoure les entrées et on update les poids par descente de gradient
     global_train_loss = []
     global_test_loss = []
-    best_models = models
+    best_models1 = models1
+    best_models2 = models2
     best_loss = 1000
+    # On parcoure les epochs 
     for ii in epochs:
         ppp = 0
+        seed = 1
+        # On crée un schéma modifié avec les modèles courant 
+        f = ModifiedField(Sys.func1,models1)
+        sigma = ModifiedField(Sys.func2,models2)
+        Sché = Schéma(Sys.Scheme,f,sigma,Sys.Rand)
         print('Training epoch {}'.format(ii))
-        epoch_train_losses = []
-        for y0_batch, h_batch, input2_batch, Ey_batch, Vy_batch in zip(training_set[0],training_set[1],training_set[2],training_set[3],training_set[4]):
-            print("  {} % \r".format(str(int(1000 * (ppp + 1)*BS / 100) / 100).rjust(3)), end="")
-            y0_batch = y0_batch[0]
-            h_batch = h_batch[0]
-            input2_batch = input2_batch[0]
-            Ey_batch = Ey_batch[0]
-            Vy_batch = Vy_batch[0]
-            # Appel à la fonction qui calcul la perte 
-            training_batch = [y0_batch,h_batch,input2_batch,Ey_batch,Vy_batch]
-            loss_train = train_batch(training_batch, models,optimizer, function, Rand)
-            epoch_train_losses.append(loss_train)
-            ppp += 1
-        # On renvoie la moyenne des erreurs des échantillons d'entrainement
-        epoch_train_loss = torch.tensor(epoch_train_losses).mean().item()
+        # On Calcule la perte test sur des données à part 
         with torch.no_grad():
             epoch_test_losses = []
             for y0_batch, h_batch, input2_batch, Ey_batch, Vy_batch in zip(testing_set[0],testing_set[1],testing_set[2],testing_set[3],testing_set[4]):
@@ -200,23 +162,61 @@ def train_models(models, training_set, testing_set, optimizer, function, Rand):
                 Vy_batch = Vy_batch[0]
                 # Appel à la fonction qui calcul la perte 
                 testing_batch = [y0_batch,h_batch,input2_batch,Ey_batch,Vy_batch]
-                loss_test = compute_MSE(testing_batch, models, function, Rand)
-                print(loss_test)
+                loss_test = compute_loss(testing_batch,Sché,Sys,seed)
                 epoch_test_losses.append(loss_test)
             epoch_test_loss = torch.tensor(epoch_test_losses).mean().item()
+        # On entraine notre modèle sur toutes les données restantes 
+        epoch_train_losses = []
+        for y0_batch, h_batch, input2_batch, Ey_batch, Vy_batch in zip(training_set[0],training_set[1],training_set[2],training_set[3],training_set[4]):
+            print("  {} % \r".format(str(int((ppp + 1)*BS)*100 / NB_POINT_TRAIN).rjust(3)), end="")
+            y0_batch = y0_batch[0]
+            h_batch = h_batch[0]
+            input2_batch = input2_batch[0]
+            Ey_batch = Ey_batch[0]
+            Vy_batch = Vy_batch[0]
+            # Appel à la fonction qui calcul la perte 
+            training_batch = [y0_batch,h_batch,input2_batch,Ey_batch,Vy_batch]
+            loss_train = train_batch(training_batch,Sché,optimizer,Sys.Rand,seed)
+            epoch_train_losses.append(loss_train)
+            ppp += 1
+            seed += 1
+        # On renvoie la moyenne des erreurs des échantillons d'entrainement
+        epoch_train_loss = torch.tensor(epoch_train_losses).mean().item()
+        # On test si la backpropagation a bien baissé la perte 
         if(epoch_train_loss<best_loss):
             best_loss = epoch_train_loss
-            best_models = models
+            best_models1 = f.mod
+            best_models2 = sigma.mod
         global_train_loss.append(epoch_train_loss)
         global_test_loss.append(epoch_test_loss)
         print(epoch_train_loss)
         print(epoch_test_loss)
-    return best_models,global_train_loss,global_test_loss
+    return best_models1,best_models2,global_train_loss,global_test_loss,best_loss
 
-# y0 est l'entrée initale , h le pas de temps , y la valeur exacte du flow au temps h avec en entrée y0
-def train_batch(training_batch, models, optimizer, function,Rand):
+# Entrainement d'un lot 
+def train_batch(training_batch, Schéma, optimizer,Rand,seed):
+    # On calcul la perte puis on fait la backpropagation  
     optimizer.zero_grad()
-    loss = compute_MSE(training_batch, models, function,Rand)
+    loss = compute_loss(training_batch, Schéma, Rand,seed)
     loss.backward()
     optimizer.step()
     return loss.item()
+
+# Calcul la perte de la fonction non modifié 
+def loss_without_train(training_set,Sys):
+    epoch_losses = []
+    seed = 1 
+    f = Field(Sys.func1)
+    sigma = Field(Sys.func2)
+    Sché = Schéma(Sys.Scheme,f,sigma,Sys.Rand)
+    for y0_batch, h_batch, input2_batch, Ey_batch, Vy_batch in zip(training_set[0],training_set[1],training_set[2],training_set[3],training_set[4]):
+        y0_batch = y0_batch[0]
+        h_batch = h_batch[0]
+        input2_batch = input2_batch[0]
+        Ey_batch = Ey_batch[0]
+        Vy_batch = Vy_batch[0]
+        training_batch = [y0_batch,h_batch,input2_batch,Ey_batch,Vy_batch]
+        loss = compute_loss(training_batch,Sché,Sys,seed)
+        epoch_losses.append(loss)
+        seed += 1
+    return torch.tensor(epoch_losses).mean().item()

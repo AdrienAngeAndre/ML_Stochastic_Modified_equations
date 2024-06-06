@@ -1,28 +1,27 @@
 import torch
-import argparse
-import numpy as np
-import scipy
-import torch.nn as nn
-import torch.optim as optim
-import torch.utils.data as data
 import matplotlib.pyplot as plt
-import time
-from model import create_models
-from model import train_models,loss_without_train
-from Init import create_dataset
-from Init import create_opt
-from Schéma import Schéma
-from Field import H,ModifiedField,AnalyticModField,Field
-from Plot import plot_fsigma,plot_fi
-from Plot import plot_loss
-from Variables import FUNC1,FUNC2,SCHEME,RAND,DIM,NB_POINT_TRAIN,NB_POINT_TEST,EPOCHS,LAMBDA,print_parameters,LR,TRUNC,Systeme
-np.random.seed(42)
+from model import create_models, train_models,loss_without_train
+from Init import create_dataset,create_opt
+from Plot import plot_Weakerr,plot_loss,plot_fsigma
+from Variables import LR,Systeme,print_parameters,EPOCHS
+
+NB_POINT_TRAIN = 300
+NB_POINT_TEST = 100 
+FUNC1 = "Linearf"
+FUNC2 = "Linearsigma"
+RAND = "Gausienne"
+SCHEME = "EMaruyamaLinear"
+DIM = 1
+TRUNC = 2
+Y0 = torch.tensor([1])
+T = 1 
+LH = [0.01,0.05,0.1,0.2,0.5]
 
 
-# Fonction qui test l'entrainement en utilisant les variables spécifiés dans le fichier de commande(Variables)  
-# et trace les courbes attendus 
+# Fonction qui test l'entrainement pour le système linéaire et trace les courbes attendus 
 def main():
     Sys = Systeme(DIM,TRUNC,FUNC1,FUNC2,SCHEME,RAND)
+    Sys.init_param_weak_err(Y0,T,LH)
     print_parameters(Sys)
     models1 = create_models(Sys.DIM,Sys.func1,Sys.TRUNC)
     models2 = create_models(Sys.DIM,Sys.func2,Sys.TRUNC)
@@ -47,9 +46,17 @@ def main():
 
     plot_loss(epochs,global_train_loss,global_test_loss,loss_without)
 
-    plt.title(f"Evolution de la perte pour le système")
-    plt.savefig("Loss.png")
+    plt.title(f"Evolution de la perte pour le système Linéaire")
+    plt.savefig("Loss_Linear.png")
 
+    plt.figure()
+
+    plot_Weakerr(Sys,models1,models2,1000000)
+    
+    plt.title(f"Erreur faible pour le Pendule")
+    plt.savefig("WeakErr_Pendulum.png")
+
+    plot_fsigma(y0_train,models1,models2,Sys)
 
 if __name__ == '__main__':
     main()
