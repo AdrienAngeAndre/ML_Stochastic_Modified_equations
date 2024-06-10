@@ -1,0 +1,606 @@
+\documentclass[12pt,a4paper,twoside]{article}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+\usepackage{a4wide} 
+\usepackage{amsmath}
+\usepackage{amssymb} 
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{color}
+\usepackage{fancybox}
+\usepackage{moreverb}
+\usepackage{listings}
+\usepackage[latin1]{inputenc}
+\usepackage{mathtools}
+\usepackage{listings}
+
+\newtheorem{prop}{Proposition}
+\newtheorem{remark}{Remarque}
+\newtheorem{hyp}{Hypothèse}
+
+\newcommand{\R}{\ensuremath{\mathbb{R}}\xspace}
+\newcommand{\E}{\ensuremath{\mathbb{E}}\xspace}
+\renewcommand{\P}{\ensuremath{\mathbb{P}}\xspace}
+\renewcommand{\AA}{\ensuremath{\mathcal{A}}\xspace}
+\newcommand{\FF}{\ensuremath{\mathcal{F}}\xspace}
+\newcommand{\LL}{\ensuremath{\mathcal{L}}\xspace}
+\DeclareMathOperator{\Cov}{Cov}
+
+% Définir les couleurs pour le code
+\definecolor{keyword}{rgb}{0.0, 0.0, 0.6}
+\definecolor{comment}{rgb}{0.0, 0.5, 0.0}
+\definecolor{string}{rgb}{0.6, 0.0, 0.0}
+
+% Configurer le package listings pour Python
+\lstset{
+    language=Python,
+    basicstyle=\ttfamily\footnotesize,
+    keywordstyle=\color{keyword}\bfseries,
+    commentstyle=\color{comment}\itshape,
+    stringstyle=\color{string},
+    showstringspaces=false,
+    numberstyle=\tiny\color{gray},
+    numbersep=5pt,
+    frame=single,
+    breaklines=true,
+    captionpos=b,
+    escapeinside={\%*}{*)}
+}
+
+\title{Rapport de Stage Assitant Ingénieur}
+\author{Coudiere Dorian}
+\date{\today}
+
+\pagestyle{headings}
+
+\begin{document}
+\lstset{ numbers=left, tabsize=3, frame=single, numberstyle=\ttfamily, basicstyle=\footnotesize} 
+\thispagestyle{empty}
+
+\begin{center}
+\makebox[\textwidth][l]{
+\raisebox{-8pt}[0pt][0pt]{
+\includegraphics[scale=0.3]{Images/irmar_0.png}
+}
+}
+\makebox[\textwidth][r]{
+\raisebox{0pt}[0pt][0pt]{
+\includegraphics[scale=0.2]{Images/logo_ensimag.pdf}
+}
+}
+Grenoble INP  -- ENSIMAG\\
+École Nationale Supérieure dInformatique et de Mathématiques Appliquées\\
+\vspace{3cm}
+{\LARGE Rapport de Stage Assitant Ingénieur}\\
+\vspace{1cm}
+Effectué à l'IRMAR/Inria Rennes\\
+\vspace{2cm}
+\shadowbox{
+\begin{minipage}{1\textwidth}
+\begin{center}
+{\Huge Implémentation d'un réseau de neurones pour faire des équations différentielles modifiées stochastiques}\\
+\end{center}
+\end{minipage}
+}\\
+\vspace{3cm}
+Coudiere Dorian\\
+3e année -- Option MMIS\\
+\vspace{3mm}
+4 Mars 2024 -- 7 juin 2024\\
+\vspace{3cm}
+\begin{tabular}{p{10cm}p{10cm}}
+{\bf Laboratoire IRMAR}                                            &{\bf Responsable de stage}\\
+{\footnotesize 263, avenue du Général Leclerc }       & ~~~Adrien Laurent\\
+{\footnotesize BP 22/23}                                        & {\bf Tuteur de l'école}\\
+{\footnotesize 35042   Rennes Cedex FRANCE}                          & ~~~Christophe Picard\\
+\end{tabular}
+\end{center}
+\newpage
+
+\tableofcontents
+
+\newpage
+
+\section{Introduction}
+
+La création et l'analyse de schéma numérique constituent un champ de recherche actif. Ces dernières décennies, la théorie des équations modifiées a pris de l'ampleur comme un outil majeure d'analyse et d'amélioration de schéma numériques. Soit une équation différentielle ordinaire (EDO) de la forme :
+\begin{equation*}
+  \dot{y} = f(y(t))\in\R^d,\quad0\leq t\leq T 
+  \label{EDO}
+\end{equation*}
+où $f:\R^d\rightarrow \R^d$ est suffisamment lisse auquel on associe le flow exact $\varphi_h^f$. Une méthode numérique définit une approximation $\phi_h^f$ du flot exact pour un pas h à l'ordre r telle que
+
+\begin{equation*}
+	\phi_h^f = \varphi_h^f + O(h^{r+1})
+	\label{approx}
+\end{equation*} 
+L'idée est de trouver une équation modifiée $\dot{y} = \tilde{f}(y(t))$ telle que  
+
+\begin{equation*}
+  y_{n+1} = \phi_h^{\tilde{f}}(y_n) = \varphi_h^f(y_n)
+  \label{ModifiedEDO}
+\end{equation*}
+On écris le champs modifié sous la forme d'une B-série \cite{Laurent20eab}
+\begin{equation*}
+  \tilde{f}(y) = f(y) + \sum\limits_{i=1}^{\infty}h^if_i(y) 
+  \label{ModifiedField}
+\end{equation*}
+La série ne converge pas toujours, mais l'idée est de tronquer la série à l'ordre N afin d'avoir un intégrateur d'ordre N+1. C'est une théorie qui est étudié dans de plus en plus de papier \cite{Hairer06gni}-IX, car en plus d'améliorer l'ordre, l'intégrateur conserve certaines propriétés géométriques sur un temps long. Cette théorie peut être plus ou moins bien étendue au cas des équations différentielles stochastiques, mais on s'intéressera ici au calcul des coefficients dans le cas stochastique. En s'inspirant de travaux réalisés dans le cas déterministe \cite{Bouchereau23mlm} on étudiera une nouvelle méthode basée sur du Machine Learning afin de déterminer l'expression de ces coefficients. 
+
+Mon stage s'est situé dans un laboratoire de recherche en mathématiques de l'université de Rennes, l'IRMAR et dans une équipe de numéricien, l'équipe Mingus(Multiscale Numerical Geometric Schemes) travaillant majoritairement sur les équations aux dérivées partielles en collaboration avec l'Inria de Rennes. J'ai travaillé sous la supervision d'Adrien Laurent et , un chercheur spécialisé dans les équations différentielles stochastiques un thème qui qu'il a fait revenir dans le laboratoire après des années. J'ai travaillé sur un sujet imaginé par lui. Le but est une fois la compréhension de la problématique, de la théorie autour des équations modifiées et de l'état de l'art de cette théorie pour les EDS qui reste maigre d'imaginer une structure pour un réseau de neurones approximant ces champs modifiés, une stratégie d'apprentissage et affiner cette structure tout au long du stage. Le but est de tester notre réseau sur des cas classiques mais néanmoins complexes puisque ce sont des problèmes stochastiques afin de voir si une approche par Machine Learning pourrait donner des résultats satisfaisant tant au niveau de la qualité de notre nouvel intégrateur que d'autres propriétés géométriques. Le code fourni vise donc à être réutilisé après le stage par des chercheurs en mathématiques appliqués afin de passer sur des problèmes plus complexes ou améliorer le réseau si les premiers résultats fournis sont satisfaisants.     
+
+\section{Intégration géométrique stochastique}
+
+\subsection{Rappel sur les EDS}
+
+Soit $(\Omega,\FF,\{\FF_t\}_{t\geq0},\P)$ un espace de probabilité complet filtré, $f:\R^d\rightarrow\R^d$ et $\sigma:\R^d\rightarrow\R^{d\times m}$ des fonctions suffisamment lisses et Lipschitziennes. Une équation différentielle stochastique (EDS) sous forme d'Ito peut s'écrire de la façon suivante \cite{Evans13ait}:
+
+\begin{equation}
+  dX = f(X)dt + \sigma(X)dW(t) 
+  \label{IntEDS}
+\end{equation}
+où $X(0) = x\in\R^d$ et $W(.) = (W_1(t),...,W_m(t))^T$ sont m processus standard de Wiener indépendants. Dans la suite on prendra $m=1$. 
+
+On peut par analogie avec les EDO définir des schémas numériques à un pas pour les EDS afin d'approximer \eqref{IntEDS} 
+\begin{equation}
+  Y_{n+1} = \phi_h^{f,\sigma}(Y_n)
+  \label{SchemaEDS}
+\end{equation}
+
+On dit qu'un schéma est d'ordre faible r si pour chaque fonction test $\phi\in C_p^\infty$ cad avec les dérivés à croissances polynomiales, pour tout $T\geq0$, $T=Nh$, h assez petit et $X_0=x$ il existe une constante positive $C(\phi,x)$ telle que  
+\begin{equation}
+  |\E[\phi(X_N)]-\E[\phi(X(T))]| \leq C(\phi,x)h^r  
+  \label{weakerr}
+\end{equation}
+
+On introduit un outil pour l'étude des EDS, le générateur,que l'on peut définir de façon formelle \cite{Abdulle12hwo} mais qu'on définira pour \eqref{IntEDS} comme 
+\begin{equation}
+   \LL\phi = \phi'f + \frac{\sigma^2}{2}\phi''
+  \label{Generator}
+\end{equation}
+
+Sous certaines hypothèses de régularité \cite{Milstein05nio}, $u(x,t) = \E[\phi(X(t))]$, satisfait l'équation dit "Backward Kolmogorov"
+
+\begin{equation}
+  \frac{\partial u}{\partial t}(x,t) = \LL u(x,t),\quadu(x,0) = \phi(x),\quadt>0
+  \label{Backward-Kolmogorov}
+\end{equation} 
+
+\eqref{Backward-Kolmogorov} nous permet d'en déduire sous certaines hypothèses claires et rigoureuses \cite{Hong22sio} et h suffisament petit :
+\begin{prop} 
+\begin{equation}
+  u(x,h) = \phi(x) + \sum\limits_{j=1}^N\frac{h^j}{j!}\LL^j\phi(x) + h^{N+1}R^h_N(\phi,x)
+  \label{Kolmogorov-expansion}
+\end{equation} 
+ 
+\end{prop}
+
+
+\begin{hyp}\cite{Abdulle12hwo}
+Pour toute fonction test  $\phi\in C_p^\infty$, l'intégrateur numérique à un developpement de Taylor faible de la forme : 
+\begin{equation}
+E[\phi(X_1)] = \phi(x) + \sum\limits_{j=1}^Nh^j\AA_{j-1}\phi(x) + h^{N+1}R_N^h(\phi,x)
+  \label{Taylor-Esperance}
+\end{equation} 
+pour h assez faible et x choisit dans un bon domaine(Talay et Tubaro 1990). 
+\end{hyp}
+
+\begin{prop}
+(Talay et Tubaro 1990) Sous des conditions techniques, si
+\begin{equation}
+  \AA_{j-1} = \frac{\LL^j}{j!},  j=1,...,r,
+  \label{Talay-Tub}
+\end{equation}	
+alors le schéma numérique est au moins d'ordre faible r 
+\end{prop}
+
+\subsection{Equations différentielles modifiés}
+
+L'idée est d'étendre la notion d'équations modifiées aux équations différentielles stochastiques en construisant $\tilde{f}$ et $\tilde{\sigma}$ comme des B-séries \cite{Laurent20eab},
+
+\begin{equation}
+     \begin{cases}
+        \tilde{f}_h(y) = f(y) + \sum\limits^\infty_{i=1}h^if_i(y)\\
+        \tilde{\sigma}_h(y) = \sigma(y) + \sum\limits^\infty_{i=1}h^i\sigma_i(y)
+     \end{cases}
+     \label{Modified_Sto_Field}
+\end{equation}
+
+Shardlow \cite{Shardlow06mef} puis plus tard Zygalakys \cite{Zygalakis11ote} ont essayer de calculer les différents coeficients de façon générale en utilisant les outils de la partie précédente. On va reprendre le calcul en tronquant à l'ordre 1 et en utilisant comme schéma numérique Euler-Maruyama. L'équation \eqref{SchemaEDS} devient 
+
+\begin{align}
+  X_1 &= x + h\tilde{f}(x) + \sqrt{h}\tilde{\sigma}(x)\xi \\
+  &=  x + h(f+hf_1) + \sqrt{h}(\sigma+h\sigma_1)\xi
+  \label{EMaruyama}
+\end{align}	
+
+et donc \eqref{Taylor-Esperance} devient 
+
+\begin{align*}
+  E[\phi(\tilde{X_1})] &= \phi(x) + h(\frac{\sigma}{2}\phi'' + 		  \phi'f) + h^2(\phi'a_1 + \frac{f^2}{2}\phi'' +                                      \phi''\sigma\sigma_1 + \frac{1}{8}\sigma^4\phi^{(4)} + \frac{1}{2}f\sigma^2\phi^{(3)}) + ... \\&= \phi(x) + L\phi(x) + A_1\phi''(x) + ...  
+\end{align*}	
+
+On en déduit : 
+
+\begin{align*}
+  \frac{L^2\phi}{2} - \tilde{A_1}\phi &= \phi'(\frac{1}{2}f'f + \frac{1}{4}f''\sigma^2 - f_1)\\ &+ \phi''(-\frac{1}{2}f^2 - \sigma\sigma_1 + \frac{1}{2}\sigma^2 + \frac{1}{4}\sigma'^2\sigma^2 + \frac{1}{2}f\sigma'\sigma + \frac{1}{2}f'\sigma^2 + \frac{1}{2}\sigma'\sigma^3) + \phi^{(3)}(\frac{1}{2}\sigma'\sigma^3)\\ &=0
+\end{align*}	
+
+Il n'est pas possible de trouver $f_1$ et $\sigma_1$ afin d'assurer la condition de Talay Tubaro, ainsi avec cette approche on n'a pas d'expressions des coefficients modifiés dependant de f et $\sigma$ quelconque. Cependant, on peut trouver des expressions pour des cas spécifiques. 
+
+\subsection{Etude de cas particuliers}
+
+\subsubsection{EDS Linéaire}
+
+On choisis un premier exemple linéaire, on prends un problème stochastique de la forme suivante dans \R, 
+   
+\begin{equation}
+	dY = \lambda Ydt + \mu YdW,\quad\lambda\in\R ,\quad\mu\in\R,\quad Y\in\R 
+	\label{Linear_EDS}
+\end{equation}
+Ce problème est un problème standard dont on connait l'unique solution, une variable aléatoire dépendant d'un bruit Brownien dont on peut calculer l'espérance et la variance. 
+
+\begin{equation}
+	Y(t) = e^{(\lambda-\frac{\mu^2}{2})t+\mu W(t)}Y_0
+	\label{Linear_Solution}
+\end{equation}
+On choisit comme schéma numérique Euler-Maruyama que l'on réécrira comme 
+\begin{equation}
+	Y_1 = Y_0 + h\tilde{f}(x) + \sqrt{h\tilde{\sigma}^2}\xi
+	\label{EMaruyama-Linear}
+\end{equation}
+avec $\tilde{\sigma}^2$ qui peut aussi s'écrire sous forme d'une B-série. De plus, on tronque les séries à l'ordre 2. D'après \eqref{Linear_Solution} et \eqref{EMaruyama-Linear}, on a 
+
+\begin{flalign*}
+   E[Y(h)] & = (1 +\lambda h + \frac{(\lambda h)^2}{2} + \frac{(\lambda h)^3}{6} + O(h^4))Y_0 & \\
+        & = Y_0 +  hf(Y_0) + h^2f_1(Y_0) + h^3f_2(Y_0) + O(h^4)
+\end{flalign*}
+\begin{flalign*}
+   Var[Y(h)] & =  (\mu^2h + (2\lambda \mu^2 + \frac{\mu^4}{2})h^2 + (\frac{\mu^6}{6} + 2\lambda^2\mu^2 + \mu^4\lambda)h^3 + O(h^4))Y_0^2 & \\
+        & = h\sigma^2(Y_0) + h^2\sigma^2_1(Y_0) + h^3\sigma^2_2(Y_0) + O(h^4)
+\end{flalign*}
+On en déduit immédiatement : 
+
+\begin{equation*}
+     \begin{cases}
+        f_1(x) =  & \frac{\lambda^2}{2}x \\
+        \sigma_1^2(x) = & (\frac{\mu^4}{2}+2\lambda\mu^2)x^2 \\
+        f_2(x) = & \frac{\lambda^3}{6}x \\
+        \sigma_2^2(x) = & (\frac{\mu^6}{6}+\lambda\mu^4+2\lambda^2\mu^2)x^2 \\
+     \end{cases}
+\end{equation*}
+
+\subsubsection{Pendule Stochastique}
+
+On décide ensuite d'étudier un problème plus complexe, un problème non-linéaire, on va étudier un système Hamiltonien, un pendule stochastique. On considère
+
+\begin{equation}
+	\begin{cases}
+H(q,p) = \frac{p^2}{2} - \cos(q)\\
+f(q,p) = J\nabla H(q,p) = \left(
+\begin{array}{c}
+p\\
+-\sin(q)\\
+\end{array}
+\right)
+,\quad J = \left(
+\begin{array}{c c}
+0 & 1\\
+-1 & 0\\
+\end{array}
+\right)
+	\end{cases}
+	\label{Pendulum}
+\end{equation}
+
+On construit l'EDS associée sous forme Stratonovich 
+
+\begin{equation}
+	dX = f(q,p)(dt + \circ dW)
+	\label{EDS_Pendulum}
+\end{equation}
+
+Ce problème est intéressant \cite{Hong22sio} en plus de sa non linearité d'une part car on considère Y de dimension 2, cela va donc augmenter le nombre de neuronnes dans les couches d'entrée et de sortie et donc complexifier l'apprentissage de notre réseaux. Mais surtout car ce système est Hamiltonien. On va donc chosir comme méthode de base point milieu stochastique qui est une méthode symplectique et que l'on va essayer d'améliorer d'un ordre. On peut calculer les différents coefficients en utilisant les propositions en partie 2.1, et on obtient :
+ 
+\begin{equation}
+f_1 = \frac{1}{8}(f''(f,f)-2f'f'f) = 
+\left(
+\begin{array}{c}
+\frac{1}{4}\cos(q)p\\
+\\\frac{1}{8}(\sin(q)p^2-2\cos(q)\sin(q))
+\end{array}
+\right)
+\end{equation}
+
+\newpage
+
+\section{Des réseaux de neurones pour les équations modifiés}
+
+\subsection{Stratégie Génerale}
+
+On va chercher à construire un réseau de neurones qui approxime les champs modifiés \eqref{Modified_Sto_Field}, on décide de garder la structure du champ modifié, on construit donc les fonctions approximées de la forme 
+
+\begin{equation}
+	\begin{cases}
+	f_{app}(y,h) = f(y) + hf_1(y)+...+h^qR_1(y,h)\\
+	\sigma_{app}(y,h) = \sigma(y) + h\sigma_1(y)+...+h^qR_2(y,h)
+	\end{cases}
+\end{equation}
+de sorte que l'erreur faible dans le sens \eqref{weakerr} soit d'ordre q. On va approximer chaque terme par un réseau de neurones plutôt que le tout par un seul pour assurer la consistance de la méthode. Chacun des termes des deux B-séries tronquées ainsi que les restes sont représentés par des Multi layer perceptron (MLP), composés d'un nombre de couches cachées et d'une fonction d'activation variable. 
+
+On construit ensuite notre dataset de la façon suivante, on choisit K différents $y_0^{(i)}$ de façon uniforme dans un compact représentatif du domaine de simulation, on choisit aussi K différents $h^{(i)}$, en choisissant $\log(h^{(i)})$ de façon uniforme dans $[\log(h_-),\log(h_+)]$, puis on calcul pour chaque point N trajectoires $y_1^{(i)}(\omega)$, d'une variable aléatoire $y_1^{(i)}$ aussi proches possibles de $\varphi_{h^{(i)}}^{f,\sigma}(y_0^{(i)})$. Pour cela on choisit la méthode de base et on l'applique avec un pas assez petit. On calcule ensuite une estimation de l'espérance $E[y_1^{(i)}]$, par un estimateur de Monte-Carlo
+
+\begin{equation}
+	\bar{X} = \frac{1}{N}\sum\limits_{k=1}^N X_k
+	\label{Monte-Carlo}
+\end{equation}
+puis la matrice de covariance $\Cov[y_1^{(i)}]$, par un estimateur 
+
+\begin{equation}
+	\Cov(x,y) = \frac{\sum\limits_{i=1}^N(X_i-\bar{X})(Y_i-\bar{Y})}{\max(0,N-\delta N)}
+\end{equation}
+
+On va ensuite entraîner notre modèle, pour chaque point k, on simule N trajectoires en utilisant les valeurs courantes des MLP du flot modifié du système appliqué à la condition $y_0^{(i)}$ au pas de temps $h^{(i)}$,  $\phi_{h^{(k)}}^{f_{app}(.,h^{(k)}),\sigma_{app}(.,h^{(k)})}(y_0^{(k)})$. On estime ensuite l'espérance et la covariance de la même manière que pour la création de nos données. Il faut ensuite estimer l'erreur entre les données prédites et les données réelles précédemment approchées. Contrairement à ce qui a été fait dans le cas déterministe \cite{Bouchereau23mlm} , on ne peut pas calculer directement la quantité aléatoire $|\phi_{h^{(k)}}^{f_{app}(.,h^{(k)}),\sigma_{app}(.,h^{(k)})}(y_0^{(k)}) - \varphi_{h^{(k)}}^{f,\sigma}(y_0^{(k)})|$, on construit donc notre fonction de perte comme 
+
+\begin{align}
+Loss_{train} &= \frac{1}{K}\sum\limits_{K=0}^{K-1} \left[\frac{|E[\phi_{h^{(k)}}^{f_{app}(.,h^{(k)}),\sigma_{app}(.,h^{(k)})}(y_0^{(k)})] - E[\varphi_{h^{(k)}}^{f,\sigma}(y_0^{(k)})]|}{h^{(k)p+1}}\right.\\  & \left. + 
+\frac{|Cov[\phi_{h^{(k)}}^{f_{app}(.,h^{(k)}),\sigma_{app}(.,h^{(k)})}(y_0^{(k)})] - Cov[\varphi_{h^{(k)}}^{f,\sigma}(y_0^{(k)})]|}{h^{(k)p+1}}\right]
+\label{Loss}
+\end{align}
+
+\begin{remark}
+L'étude des deux premiers moments ne suffisent pas à déduire la loi de notre variable aléatoire, cependant ils suffisent dans nos cas à trouver les différents termes des B-séries, c'est pourquoi on se limite à l'espérance et la covariance dans notre fonction de perte. 
+\end{remark}
+
+
+On met en suite à jour les poids et les biais de nos différents MLP pour minimiser cette fonction de perte. Afin d'évaluer la performance de notre apprentissage, on utilise de plus une stratégie classique, on divise notre ensemble de données en 2, 80\% qui est utilisé aussi pour l'entraînement et donc sur lequel on évalue la fonction de perte sur des données connues et 20\% qui est réservée à l'évaluation et qui ne sera jamais donnée à notre réseau de neurones afin d'observer les potentiels phénomènes de surapprentissage.   
+
+
+\subsection{Réglage des hyperparamètres}
+
+Maintenant que notre modèle et notre stratégie d'apprentissage bien définit, il reste néanmoins à calibrer le modèle, ce qui consiste en le réglage des hyperparamètres. Les hyperparamètres sont des paramètres définis en amont de l'apprentissage contrairement aux poids par exemples qui eux varient et qui vont fortement influer sur la vitesse et la qualité de celui-ci. On va donc bien régler ceux-ci. On retrouve parmi les principaux hyperparamètres :
+
+\begin{itemize}
+\item Nombre de couches cachées et nombre de neurones par couche cachée
+
+Ce sont les paramètres géométriques du réseau de neurones. Le théorème d'approximation universel nous dit que l'on peut approximer n'importe quel fonction continue définit sur un compact grâce à un MLP avec seulement 1 couche cachée. Cependant, le théorème ne nous dit rien sur le nombre de neurones sur cette couche et pour des fonctions complexes, il peut exploser. On va donc fixer le nombre de neurones et tester avec plusieurs profondeurs. 
+
+\begin{minipage}{0.4\textwidth}
+    \begin{figure}[H]
+        \includegraphics[scale=0.33]{Images/R1.png}
+        \caption{Fonction de perte sur le cas Linéaire en utilisant des MLPs avec 1 couches cachées et 100 neurones par couche}
+        \label{MLP5}
+    \end{figure}
+\end{minipage}
+\hspace{4ex} % eventuellement
+\begin{minipage}{0.4\textwidth}
+    \begin{figure}[H]
+        \includegraphics[scale=0.33]{Images/R2.png}
+        \caption{Fonction de perte sur le cas Linéaire en utilisant des MLPs avec 2 couches cachées et 50 neurones par couche}
+        \label{MLP1}
+    \end{figure}
+\end{minipage} 
+
+On observe que pour un réseau de neurones plus profonds (Figure \ref{MLP1}), la perte va converger vers une meilleure valeur et en moins d'epochs et donc très probablement fournir de meilleurs résultats. Cependant, avoir un réseau de neurones trop profond peut créer des problèmes comme l'exploding gradient, le vanishing gradient ou simplement juste rallonger le temps de la Backpropagation. Dans notre cas, on se limitera à 2 couches cachées avec 50 neurones sur chacune donnant déjà de très bons résultats.  
+
+\item Fonction d'activation
+
+La fonction d'activation est un autre élément important à choisir, c'est elle qui va introduire de la non-linéarité dans notre modèle. On retrouve historiquement 3 fonctions d'activations. 
+
+\begin{itemize}
+ 
+\item Sigmoïde : $f(x) = \frac{1}{1+e^{-x}}$
+
+La sigmoïde était une fonction beaucoup utilisée, mais elle est un peu dépassée notamment puisqu'elle ne converge pas vers l'identité en 0, une propriété qui si elle était vérifiée garantirait un apprentissage rapide avec une initialisation quelconque. On ne va donc pas l'utiliser et on va donc plutôt utiliser :
+
+\item ReLU : f(x) = $\begin{cases}
+                         0$ si $x<0\\
+                         x$ si $x\geq0
+                     \end{cases}$
+
+C'est la fonction que l'on va utiliser en majorité pour plusieurs raisons, d'une part, elle possède une dérivée monotone, une propriété qui va avoir tendance à réduire l'overfitting. D'autre part contrairement à d'autres fonctions d'activations, elle va renvoyer moins de valeurs proches de 0 et donc réduire significativement les risques de vanishing Gradient.Cependant, ReLu possède une étendue infinie et donc peut entraîner une instabilité dans l'apprentissage et donc dans certains cas (notamment si améliore l'ordre de plus de 1 ordre) on utilisera plutôt :
+
+\item Tan hyperbolique : f(x) = $f(x) = \tanh(x)$
+ 
+\end{itemize}
+
+\item Algorithme d'optimisation
+
+On doit aussi choisir l'algorithme d'optimisation de nos poids, tous les algorithmes sont basés sur une descente de gradient, mais il y a des variantes. La variante qui aujourd'hui marche le mieux sur des taches complexes (Figure \ref{Adam}) et celle qu'on va donc utiliser est Adam. Nous ne détaillerons pas l'algorithme ici, mais le principe de base de l'algorithme est de calculer pour chaque poids un learning rate adaptatif à partir d'estimateurs des deux premiers moments du gradient \cite{Kingma}. 
+
+\begin{figure}
+    \centering
+    \includegraphics[height=6cm]{Images/Adam.png}
+    \caption{Comparaison de la fonction de perte au cours des epochs pour différents algorithmes classiques d'optimisations sur un problème complexe(reconaissance d'images)}
+    \label{Adam}
+\end{figure}
+
+
+\item Learning rate
+
+Enfin, le paramètre le plus important à régler est probablement le Learning rate. Le learning rate est le pas d'optimisation de la fonction de perte. Ainsi, il est important d'avoir un pas adapté à la perte, si le pas est trop grand alors on va jamais attendre avec une précision suffisante le minimum globale de la fonction et au contraire si le pas est trop petit alors on peut mettre trop de temps à atteindre le minimum global ou même atteindre un minimum local différent du globale et rester dedans. La fonction de perte étant souvent difficile à étudier analytiquement, on va tester plusieurs valeurs du pas avec un GridSchearch ou un RandomSchearch. Comme le learning rate dans Adam est adapté durant l'apprentissage, ici, on va simplement faire un GridSchearch avec quelques valeurs pour déterminer un bon ordre de grandeur du learning rate (Figure \ref{LR}). 
+ 
+\begin{figure}
+    \centering
+    \includegraphics[height=6cm]{Images/LR.png}
+    \caption{Valeur finale de la fonction de perte en fonction du learning rate de base pour le problème linéaire avec 50 epochs}
+    \label{LR}
+\end{figure}
+
+On voit bien que le Learning rate doit être dans une plage de valeur pour donner un résultat convenable. Ici en prendras le Learning rate entre $10^{-4}$ et $10^{-5}$. 
+
+\end{itemize}  
+
+\subsection{Structure du code}
+
+Dans cette section, on expliquera la structure de l'implémentation sans rentrer dans les détails du code. Pour l'implémentation on utilisera python et le package pytorch. On choisit cela d'une part pour se simplifier l'implémentation du réseau en lui-même en évitant de devoir recoder notre propre version des algorithmes optimisés de descentes de gradient comme Adam présenté précédemment. D'autre part car le code est à destination des chercheurs en mathématiques appliqués et vise à être repris ou modifié par des personnes non expertes dans beaucoup de langages autres que python et donc on préfère une implémentation simple. Enfin on utilise pytorch car c'est un package de Machine learning qui est assez optimisé pour de l'apprentissage de Multi layer perceptron sur GPU. Pour notre tâche, utiliser Tensorflow une alternative par exemple ralentirait le processus.     
+
+Pour se rapprocher au mieux du problème mathématique, on utilisera un mélange de procédural et d'orienté objet. On définira une classe Field qui correspond à un champ de vecteurs, il possède  entre autres un champ identifiant son type et une méthode pour l'évaluer en (y,t). 
+
+\begin{lstlisting}[language=Python]
+class Field: 
+    def __init__(self,field):
+\end{lstlisting}
+
+
+À partir de cette classe on définit 2 sous-classes : ModifiedField qui correspond à un champ de vecteurs modifié par Machine Learning, il contient donc notamment un entier correspondant à l'ordre de troncature et une liste de MLP correspondant aux différents termes de la série modifiée. 
+
+\begin{lstlisting}[language=Python]
+class ModifiedField(Field):
+    def __init__(self, field, mod):
+\end{lstlisting}
+
+AnalyticModField qui correspond à un champs de vecteur modifié en calculant les termes analitiquement si on peux comme dans la partie 2.3 
+
+\begin{lstlisting}[language=Python]
+class AnalyticModField(Field):  
+    def __init__(self,field,trunc):
+\end{lstlisting}
+
+C'est une implémentation logique puisque l'évaluation d'un champ de vecteurs modifié dépend entre autres de l'évaluation de ce même champ non modifié. 
+
+On définira de plus une structure Schéma correspondant à un intégrateur numérique, il contient notamment le type d'intégrateur ainsi que les termes de drift et de diffusions sous forme de Field qui peuvent donc être modifiés ou non. 
+
+\begin{lstlisting}[language=Python]
+class Schéma:
+    def __init__(self,Scheme,f,sigma,Rand):
+\end{lstlisting}
+
+Je ne détaillerais pas trop les fonctions d'entrainements du modèle mais on utilise des fonctions définit dans notre classe Schéma pour faire un pas de notre intégrateur sur chacune des données puis on implémente à la main le calcul de notre propre fonction de perte définit par \ref{Loss}. Le reste est simplement de la bonne manipulation de tenseurs et de fonctions internes à pytorch.  
+
+Je ne détaillerais pas non plus le reste de code car il est très standard mais il contient notamment les fonctions de création des données, les fonctions pour plot les metrics importantes notamment celles présentés dans la partie 4 mais aussi des structures simples afin de facilement pouvoir modifier les différents paramètres géométriques du réseau de neurones ou les différents paramètres du problème mathématiques à travers un fichier de commande tout en stockant les expériences déjà réalisées. 
+
+\section{Simulation numérique}
+
+\subsection{Cas Linéaire}
+
+En entrainant notre réseau de neurones sur des valeurs de $Y_0$ dans l'intervalle [0,2], on peut observer les $f_i$ et $\sigma_i$ sur cette plage de valeur.
+
+On peut observer dans un premier temps l'évolution de la fonction de perte (Figure \ref{1}), on voit qu'avec une bonne valeur de $\eta$, on obtient une baisse significative de la différence entre les deux métriques assez rapidement avant de se stabiliser. Si on compare à la valeur de cette même fonction de perte sans modification. Pour vérifier ça. Mais cette perte ne donne pas toute l'information, pour vérifier ça, on va tracer l'évolution de l'erreur faible en fonction de h (Figure \ref{2}). Pour le schéma non modifié, on bien une erreur faible d'ordre 1, alors que pour notre fonction, on est autour de l'ordre faible deux ou trois, c'est ce qui est attendus. On observe cette erreur pour des pas h relativement grands car on estime l'espérance par un estimateur simple de Monte-Carlo et due au fait qu'on couple cela avec du Machine Learning qui demande déjà beaucoup de ressources computationnelles, on est limité sur le nombre de trajectoires que l'on peut simuler entrainant une assez grande erreur de Monte-Carlo.
+
+\begin{figure}
+    \centering
+    \includegraphics[height=6cm]{Images/R2.png}
+    \caption{Evolution de la fonction de perte \ref{Loss} sur l'approximation de l'équation modifié Linéaire \ref{Linear_EDS}  en fonction du nombre d'epochs (Passage sur l'ensemble des données d'entrainement)}
+    \label{1}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[height=6cm]{Images/Weak_err.png}
+    \caption{Evolution du l'erreur faible en fonction du pas de la méthode numérique h pour Euler Maruyama et pour Euler Maruyama modifié grâce à notre approximation  appliqué à l'équation stochastique Linéaire \ref{Linear_EDS}}
+    \label{2}
+\end{figure}
+
+On peut aussi observer la différence entre les fonctions calculées par les MLPs et les valeurs théoriques calculés précédemment (Figure \ref{f1Linear}/\ref{sigma1Linear}}). Sur la plage de valeur qui nous a servi pour l'entraînement, on voit bien que nos différents MLPs ont réussi à approximer les valeurs théoriques des $f_i$ et $\sigma_i$.
+
+\begin{minipage}{0.4\textwidth}
+    \begin{figure}[H]
+        \includegraphics[scale=0.33]{Images/f1Linear.png}
+        \caption{Comparaison entre le premier terme de diffusion $f_1$ calculé précédement et approximé par notre réseau}
+        \label{f1Linear}
+    \end{figure}
+\end{minipage}
+\hspace{4ex} % eventuellement
+\begin{minipage}{0.4\textwidth}
+    \begin{figure}[H]
+        \includegraphics[scale=0.33]{Images/sigma1Linear.png}
+        \caption{Comparaison entre le premier terme de diffusion $\sigma_1$ calculé précédement et approximé par notre réseau}
+        \label{sigma1Linear}
+    \end{figure}
+\end{minipage} 
+
+
+On observe que sous une certaine erreur et en dimension 1, les différentes parties de la fonction modifiées peuvent être approximées par un réseau de neurones entraîné pour minimiser notre fonction de perte. 
+
+\subsection{Pendule Stochastique}
+
+Dans un premier temps, on entraîne notre réseau de neurones pour des valeurs dans l'espace $[-\pi,\pi]\times[-1.5,1.5]$, cependant dans notre cas la complexité de calcul due au mélange Machine Learning et Stochastique peuvent rendre le calcul avec un nombre de points suffisant assez long. Cependant, on sait que la solution exacte vit sur $\{y | H(y) = H(y0)\}$  afin de réduire notre domaine, on va donc choisir nos points dans un tube autour d'une ellipse approchant la phase réelle. Notre nouveau domaine devient 
+
+\begin{equation}
+	\left(\begin{array}{c}
+	\frac{\pi}{3}\cos(\theta)+\epsilon_1\\
+	\sin(\theta)+\epsilon_2\\
+	\end{array}
+	\right)\,\quad\theta\in[0,2\pi],\quad\epsilon_1\epsilon_2\in[-0.2,0.2]
+	\label{NewDomain} 
+\end{equation}
+ 
+Ainsi, on peut voir qu'avec un nombre de points raisonnable, on couvre bien mieux notre nouveau domaine (Figure \ref{New_Init}) que notre choix initial (Figure \ref{Basic_Init}). 
+
+\begin{minipage}{0.4\textwidth}
+    \begin{figure}[H]
+        \includegraphics[scale=0.33]{Images/Basic_Init.png}
+        \caption{Génération de 1000 points dans le domaine de base $[-\pi,\pi]\times[-1.5,1.5]$}
+        \label{Basic_Init}
+    \end{figure}
+\end{minipage}
+\hspace{4ex} % eventuellement
+\begin{minipage}{0.4\textwidth}
+    \begin{figure}[H]
+        \includegraphics[scale=0.33]{Images/New_Init.png}
+        \caption{Génération de 1000 points dans le nouveau domaine définit \eqref{NewDomain}}
+        \label{New_Init}
+    \end{figure}
+\end{minipage} 
+
+On peux maintenant observer notre fonction de perte (Figure \ref{4}). La fonction de perte a une évolution cohérente, elle décroît rapidement et est réduite de l'ordre de $10^{-1}$, on constate que par rapport au problème linéaire \ref{1} la perte met plus de temps avant de converger, on constate aussi qu'il y a plus d'overfiting, un problème qui a été en partie réglé par l'ajout d'un dropout, et aussi par le changement de notre fonction d'activation par ReLu.
+
+\begin{figure}
+    \centering
+    \includegraphics[height=6cm]{Images/train_loss.png}
+    \caption{Evolution de la fonction de perte appliqué au pendule stochastique}
+    \label{4}
+\end{figure}
+
+
+De même qu'avec le cas linéaire (Figure \ref{2}), on va observer l'erreur faible en fonction de h pour confirmer l'évolution de la fonction de perte (Figure \ref{5}). On prend une plage de pas assez faible [0.1,0.5] d'une part, car on utilise un point fixe qui converge seulement si $h\leq0.5$ pour appliquer Point Milieu et d'autre part, car l'application du schéma est assez coûteux et donc dans le cadre de nos simulations, on va restreindre le nombre de trajectoires imposant à cause de l'erreur de Monte-Carlo un pas élevée. On voit bien que sur cette plage la constante de l'erreur faible à diminuer, on se rapproche bien aussi d'un ordre deux ce qui est attendu, Point Milieu stochastique étant d'ordre 1 comme EMaruyama, mais avec un coefficient plus faible. 
+
+\begin{figure}
+    \centering
+    \includegraphics[height=6cm]{Images/Weak_err_pendulum.png}
+    \caption{Evolution du l'erreur faible en fonction du pas de la méthode numérique h pour Point Milieu et pour Point Milieu modifié grâce à notre approximation appliqué au pendule stochastique \ref{Pendulum}}
+    \label{5}
+\end{figure}
+
+On peut s'interesser maintenant aux propriété géométriques de notre champs de vecteur c'est un hamiltonien. Un des principal choix de Point Milieu est que c'est un intégrateur symplectique, il va donc conserver l'hamiltonien sous une certaine erreur. On aimerait que notre nouvel intégrateur conserve cette propriété. On va donc observer l'erreur entre $\Tilde{H_{app}}(y_t)$ calculé avec notre intégrateur modifié et $H(y_0)$ (Figure \ref{6}). On voit que sur des temps faibles, on a bien la conservation de l'Hamiltonien à une erreur similaire à celle produite par la méthode non améliorée. Cependant, sur des temps longs, l'erreur va diverger donc notre méthode n'est pas symplectique. L'intégrateur modifié analytiquement n'est pas non plus symplectique sur des temps très long donc on peut considerer nos résulats comme satisfaisant.
+
+\begin{figure}
+    \centering
+    \includegraphics[height=6cm]{Images/Hamiltonian.png}
+    \caption{Evolution de l'erreur sur l'hamiltonien en fonction du temps en appliquant Point Milieu et Point Milieu modifié grâce à notre approximation applqué au pendule stochastique \ref{Pendulum}}
+    \label{6}
+\end{figure}
+
+Cependant, on pourrais améliorer nos résulats en encodant directement la géométrie du problème dans notre réseaux de neurones. Pour les systèmes hamiltonien il y a beaucoup de théorie sur les réseaux de neurones hamiltoniens dans le cadre de problèmes non stochastiques \cite{Marco} \cite{Greyd}, on laisse donc pour des travaux futures l'implémentation d'un reseaux hamiltonien afin de potentiellement réduire l'erreur sur l'hamiltonien ou garder la symplecticité pour des temps plus longts. On peut aussi se pencher sur des problèmes à divergence nulle donc qui conserve le volume \cite{Zhu} ou plus generalement des réseaux de neurones pour des problèmes qui vivent sur une variété \cite{White}. 
+
+
+\newpage
+
+\section{Bilan personnel du stage} 
+
+Dans cette section je détaillerais uniquement mon bilan personnel du stage et ce qu'il m'a apporté. Le bilan technique de ce qui été fait et les réflexions pour les futurs travaux dans la continuité se trouvent en partie 6. 
+
+Ce stage a pour moi été un véritable défi, n'ayant jamais eu d'expérience en recherche, j'avais postulé pour le sujet mais aussi pour voir le monde de la recherche de l'intérieur. Même si le sujet m'intéressait, je dirais qu'il restait assez compliqué pour moi d'un point de vue technique. Je n'avais jamais travaillé sur autour du stochastique de ma vie et il m'a fallu dans un premier me remémorer mes cours de méthodes numériques. Un autre défi était aussi autour du réseau de neurones, j'avais suivi des cours sur le Machine/Deep learning lors de mon semestre de mobilité à l'étranger cependant ces cours étaient assez guidés sur le choix de l'architecture ou les paramètres du modèle. Cependant un véritable point positif du stage a été la disponibilité de mon tuteur pour m'apprendre des choses. Etant spécialistes des méthodes stochastiques, il m'a énormément appris dans un premier temps me permettant ensuite de mener une bonne partie du travail en quasi-autonomie. J'ai aussi eu la chance de pouvoir m'entretenir avec d'autres chercheurs et doctorants notamment Maxime Boucheraux qui a travaillé sur du Machine Learning pour les EDO \cite{Bouchereau23mlm} et qui m'a aidé sur la partie Machine Learning dans les premières semaines.
+
+Je suis content d'avoir pu côtoyer le monde de la recherche et même si je ne comptais pas faire de thèse, j'ai trouvé énormément d'avantages à la  recherche. D'une part la liberté dans l'avancement du projet, même s'il faut rester conscient de l'objectif du stage, il n'y a pas vraiment de hiérarchie et on peut facilement proposer des idées voire débattre de comment faire avancer les choses et des futurs choix. D'autre part j'ai énormément apprécié le constant apprentissage des chercheurs, quand on est chercheurs, on apprend toujours que ce soit dans notre domaine ou celui d'autres. Dans le laboratoire, il y avait énormément de présentations, des séminaires réservés aux chercheurs mais aussi des présentations plus courtes et faciles à comprendre comme les 5 minutes Lebesgues. J'ai aussi eu l'occasion de participer à un workshop organisé par l'équipe Mingus et même si les subtilités de beaucoup de présentations m'ont échappé à cause de mon niveau technique, voire des gens impliqués comme ça sur des points précis d'un domaine étaient très inspirant.  
+
+Cependant j'ai aussi trouvé quelques points négatifs et des défis. D'une part le côté administratif, j'ai vu mon tuteur passer des heures sur des papiers et chercher des financements en m'expliquant la difficulté d'en avoir en France. Détestant l'administratif c'est un point qui me rebute. Il faut aussi beaucoup voyager et même si c'est un point positif pour beaucoup, je ne suis pas quelqu'un qui apprécie être en déplacement toutes les semaines. Un autre défi est que même si ça peut être agréable d'avancer en terrain vague, c'est assez difficile d'évaluer son travail, il y a beaucoup de moments ou j'avais des résultats sans réellement savoir si c'était normal ou si de mauvais résultats venaient du problème de base ou de mon implémentation. C'est quelque chose qui diffère vraiment de cadre scolaire ou si le travail est bien fait on a des bons résultats. C'est un défi qui demande du temps d'analyse des résultats et beaucoup de discussion avec d'autres chercheurs plus expérimentés comme mon tuteur.    
+
+Je rajouterais aux difficultés techniques déjà évoqués que le fait de travailler en stochastiques oblige d'observer les bonnes metrics avec énormément de trajectoires, ce qui ralentit en plus du temps d'apprentissage qui peut être long l'obtention de résultats. Une solution a été de passer notre code sur GPU mais j'ai eu quelques problèmes de mémoires que j'ai dû compenser en limitant certaines vectorisations notamment celles utilisé pour calculer la perte de plusieurs entrées en même temps. Cela entraine aussi une limite sur le nombre de trajectoires produites et donc la qualité des observations.     
+
+Pour conclure cette partie, je dirais que ce stage m'a beaucoup appris, énormément d'un point de vue technique mais aussi sur la communication en m'imposant une rigueur écrite sur l'écriture de rapport mathématique mais aussi oral puisque j'ai eu l'occasion de faire une soutenance devant de brillants chercheurs Philippe Chartier, Mohammed Lemou et Florian Méhats qui avaient à coeur de voir les résultats de mon stage afin de potentiellement poursuivre le travail. Je suis en plus globalement très satisfait du déroulé du stage et du travail effectué au vu de mon niveau dans le domaine au début du stage. 
+
+
+\section{Conclusion}
+
+Pendant ce stage, on avait pour but de construire un modèle permettant d'approximer un intégrateur numérique modifié à partir d'un intégrateur numérique de base. On a donc construit un réseau de neurones basé sur plusieurs Multi layer Perceptron en gardant la structure du problème. Après avoir étudié l'influence des différents hyperparamètres et les régler au mieux sur notre problème. On a utilisé notre réseau sur deux exemples afin d'une part de comparer notre approximation aux résultats analytiques que l'on a calculés. Et d'autre part afin de voir l'influence de paramètres comme la dimension, l'ordre de troncature de l'équation modifiée ou la géométrie du problème de base. On a pu observer que malgré certaines limitations, le modèle donne des résultats cohérents et on peut continuer sur cette base. 
+
+Cependant, il reste beaucoup de choses à faire. On pourrait d'une part tester notre modèle sur d'autres exemples. On pourrait par exemple étudier sur une EDS avec bruit additif et ainsi se pencher sur la mesure invariante plutôt que l'erreur faible. On pourrait aussi étudier le cas général même si cela ne marche pas totalement théoriquement afin de voir si l'approximation reste correcte. La problématique de temps de calcul direct des coefficients modifiés apparaissant particulièrement à haute dimension, il faudrait étudier pour de plus grandes dimensions et tronquer à des ordres plus grands. Enfin, il faudrait étudier plus en détail la complexité de l'apprentissage afin de l'améliorer. On pourrait aussi utiliser un autre langage différent de python/pytorch afin d'utiliser pleinement la puissance du GPU tout en gérant mieux les ressources allouées, cela permettrait de mettre beaucoup plus de points et donc d'obtenir de meilleurs résultats.
+
+\newpage
+
+\bibliographystyle{abbrv}
+\bibliography{Ma_Bibliographie}
+
+\end{document}

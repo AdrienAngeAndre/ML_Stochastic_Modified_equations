@@ -9,11 +9,13 @@ NB_POINT_TRAIN = 300
 NB_POINT_TEST = 100 
 FUNC1 = "Linearf"
 FUNC2 = "LinearSigma"
-RAND = "Gausienne"
+RAND = "Gaussienne"
 SCHEME = "EMaruyamaLinear"
 DIM = 1
 TRUNC = 2
-Y0 = torch.tensor([1])
+LAMBDA = 1
+MU = 0.1
+Y0 = torch.tensor([1.0])
 T = 1 
 LH = [0.01,0.05,0.1,0.2,0.5]
 
@@ -21,10 +23,11 @@ LH = [0.01,0.05,0.1,0.2,0.5]
 # Fonction qui test l'entrainement pour le système linéaire et trace les courbes attendus 
 def main():
     Sys = Systeme(DIM,TRUNC,FUNC1,FUNC2,SCHEME,RAND)
+    Sys.init_param_linear(LAMBDA,MU)
     Sys.init_param_weak_err(Y0,T,LH)
     print_parameters(Sys)
-    models1 = create_models(Sys.DIM,Sys.func1,Sys.TRUNC)
-    models2 = create_models(Sys.DIM,Sys.func2,Sys.TRUNC)
+    models1 = create_models(Sys.Dim,Sys.func1,Sys.trunc)
+    models2 = create_models(Sys.Dim,Sys.func2,Sys.trunc)
 
 
     y0_train, h_train, input2_train, Ey_train, Vy_train = create_dataset(NB_POINT_TRAIN,Sys,Sys.Dim)
@@ -51,10 +54,10 @@ def main():
 
     plt.figure()
 
-    plot_Weakerr(Sys,models1,models2,1000000)
+    plot_Weakerr(Sys,models1,models2,10000000)
     
     plt.title(f"Erreur faible pour le Pendule")
-    plt.savefig("WeakErr_Pendulum.png")
+    plt.savefig("WeakErr_Linear.png")
 
     plot_fsigma(y0_train,models1,models2,Sys)
 

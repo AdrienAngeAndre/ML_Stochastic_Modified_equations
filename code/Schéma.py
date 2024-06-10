@@ -45,7 +45,7 @@ def PFixe(q0,h,rand,schéma):
         while N<10 and torch.max(torch.abs(aux-save))>10**(-7):
             save = aux
             if schéma.f.Field == schéma.sigma.Field :
-                aux = q + (h+torch.sqrt(h)*r)*schéma.f.evaluate((aux+q)/2,h)
+                aux = q + (h+torch.sqrt(h)*r)*schéma.f.evaluate((aux+q)/2,h).to(DEVICE)
             else:
                 aux = q + (h*schéma.f.evaluate((aux+q)/2,h)+torch.sqrt(h)*schéma.sigma.evaluate((aux+q)/2,h)*r)
             N += 1
@@ -79,6 +79,8 @@ class Schéma:
             if(np.shape(y0)[0] == 1):
                 y = y0.repeat(np.shape(r)[0],1) + h.repeat(np.shape(r)[0],1)*self.f.evaluate(y0,h) + torch.sqrt(h)*torch.sqrt(torch.abs(self.sigma.evaluate(y0,h)))*r
             else:
+                y0 = y0.to(DEVICE)
+                h = h.to(DEVICE)
                 y = y0 + h*self.f.evaluate(y0,h) + torch.sqrt(h)*torch.sqrt(torch.abs(self.sigma.evaluate(y0,h)))*r
             return y
         # Point milieu stochastique 
@@ -103,7 +105,8 @@ class Schéma:
                 if t == h_comp:
                     y = y.repeat(traj,1)
                     h = h.repeat(traj,1)
-                l.append(torch.mean(y,dim=0))
+                if save_l:
+                    l.append(torch.mean(y,dim=0))
                 y = self.step(y,h,rand)
         if save_l:
             l.append(torch.mean(y,dim=0))
@@ -116,6 +119,7 @@ class Schéma:
         # On parcoure la plage des h 
         for h in lh :
             y1 = torch.mean(self.Applied(y0,torch.tensor([h]),T,nb_traj,False),dim=0)
+            ytrue = ytrue.to(DEVICE)
             E1.append(torch.norm(y1-ytrue).to("cpu"))
         return E1 
 
@@ -129,9 +133,9 @@ class Schéma:
     # Plot l'erreur sur entre H(y) et H(y0) sur laquelle le schéma est appliqué 
     def plot_ErrH(self,h,label):
         v = []
-        H0 = (torch.mean(-torch.cos(self.l[i][0])+(self.l[i][1])**2/2))
+        H0 = (torch.mean(-torch.cos(self.l[0][0])+(self.l[0][1])**2/2))
         for i in range(0,len(self.l)):
-            v.append(torch.abs((torch.mean(-torch.cos(self.l[i][0])+(self.l[i][1])**2/2))-H0))
+            v.append(torch.abs((torch.mean(-torch.cos(self.l[i][0])+(self.l[i][1])**2/2))-H0).to("cpu"))
         plt.plot([i*h for i in range(len(self.l))],v,label=label)
 
     #Plot l'évolution de la phase sur la période sur laquelle le schéma est appliqué 
@@ -139,8 +143,8 @@ class Schéma:
         a = []
         b = []
         for i in range(0,len(self.l)):
-                a.append(self.l[i][0])
-                b.append(self.l[i][1])
+                a.append(self.l[i][0].to("cpu"))
+                b.append(self.l[i][1].to("cpu"))
         plt.plot(a,b,label=label)
 
     

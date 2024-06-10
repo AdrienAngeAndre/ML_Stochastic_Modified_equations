@@ -72,7 +72,7 @@ def plot_fsigma(y0_train,models1,models2,Sys):
     plt.figure()
     f.print_modfield(1,y0_train)
     f2.print_ana(1,y0_train)
-    plt.title(rf'$f_1$ $\lambda = {Sys.Lambd}$ $\mu = {Sys.Mu} $')
+    plt.title(rf'$f_1$ $\lambda = {Sys.lambd}$ $\mu = {Sys.mu} $')
     plt.xlabel("x")
     plt.ylabel(r'$f_1(x) $')
     plt.legend()
@@ -81,7 +81,7 @@ def plot_fsigma(y0_train,models1,models2,Sys):
     plt.figure()
     sigma.print_modfield(1,y0_train)
     sigma2.print_ana(1,y0_train)
-    plt.title(rf'$\sigma_1$ $\lambda = {Sys.Lambd}$ $\mu = {Sys.Mu} $')
+    plt.title(rf'$\sigma_1$ $\lambda = {Sys.lambd}$ $\mu = {Sys.mu} $')
     plt.xlabel("x")
     plt.ylabel(r'$\sigma_1(x) $')
     plt.legend()
@@ -91,7 +91,7 @@ def plot_fsigma(y0_train,models1,models2,Sys):
         plt.figure()
         f.print_modfield(2,y0_train)
         f2.print_ana(2,y0_train)
-        plt.title(rf'$f_2$ $\lambda = {Sys.Lambd}$ $\mu = {Sys.Mu} $')
+        plt.title(rf'$f_2$ $\lambda = {Sys.lambd}$ $\mu = {Sys.mu} $')
         plt.xlabel("x")
         plt.ylabel(r'$f_2(x) $')
         plt.legend()
@@ -100,7 +100,7 @@ def plot_fsigma(y0_train,models1,models2,Sys):
         plt.figure()
         sigma.print_modfield(2,y0_train)
         sigma2.print_ana(2,y0_train)
-        plt.title(rf'$\sigma_2$ $\lambda = {Sys.Lambd}$ $\mu = {Sys.Mu} $')
+        plt.title(rf'$\sigma_2$ $\lambda = {Sys.lambd}$ $\mu = {Sys.mu} $')
         plt.xlabel("x")
         plt.ylabel(r'$\sigma_2(x) $')
         plt.legend()
@@ -109,7 +109,7 @@ def plot_fsigma(y0_train,models1,models2,Sys):
 
 def Esperance(Systeme,nb_traj):
     if Systeme.func1 == "Linearf":
-        ytrue = torch.ones(10,1)*torch.tensor(1)*np.exp(Systeme.Lambd*1)*torch.tensor(1)
+        ytrue = torch.tensor(1)*np.exp(Systeme.lambd*1)*torch.tensor(1)
     else:
         f = Field(Systeme.func1)
         sigma = Field(Systeme.func2)
@@ -125,7 +125,7 @@ def plot_Weakerr(Systeme,models1,models2,nb_traj):
     y0 = Systeme.y0 
     T = Systeme.T 
     # On définit un schéma de référence Point Milieu simple
-    ytrue = Esperance()
+    ytrue = Esperance(Systeme,nb_traj)
     # On définit Point milieu modifié en utilisant les models entrainés 
     fmod = ModifiedField(Systeme.func1,models1)
     sigmamod = ModifiedField(Systeme.func2,models2)
@@ -198,8 +198,8 @@ def plot_Phase(Systeme,models1,models2):
     sigma = Field(Systeme.func2)
     A2 = Schéma(Systeme.Scheme,f,sigma,Systeme.Rand) 
 
-    A1.Applied(torch.tensor([0,1]),0.1,20,1,True)
-    A2.Applied(torch.tensor([0,1]),0.1,20,1,True)
+    A1.Applied(torch.tensor([0.0,1.0]),torch.tensor([0.1]),20,1,True)
+    A2.Applied(torch.tensor([0.0,1.0]),torch.tensor([0.1]),20,1,True)
     A1.plot_Phase(r'Phase Schéma Modifié')
     A2.plot_Phase(r'Phase Schéma Simple')
     plt.legend()
@@ -214,8 +214,8 @@ def plot_ErrH(Systeme,models1,models2):
     sigma = Field(Systeme.func2)
     A2 = Schéma(Systeme.Scheme,f,sigma,Systeme.Rand) 
 
-    A1.Applied(torch.tensor([0,1]),0.1,20,1,True)
-    A2.Applied(torch.tensor([0,1]),0.1,20,1,True)
+    A1.Applied(torch.tensor([0.0,1.0]),torch.tensor([0.1]),20,1,True)
+    A2.Applied(torch.tensor([0.0,1.0]),torch.tensor([0.1]),20,1,True)
     A1.plot_ErrH(0.1,r'$|H_app(y_t)-H(y_0)|$')
     A2.plot_ErrH(0.1,r'$|H(y_t)-H(y_0)|$')
     plt.legend()

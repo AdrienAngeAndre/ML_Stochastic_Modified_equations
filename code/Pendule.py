@@ -9,7 +9,7 @@ NB_POINT_TRAIN = 300
 NB_POINT_TEST = 100 
 FUNC1 = "Pendule"
 FUNC2 = "Pendule"
-RAND = "Gausienne"
+RAND = "Gaussienne"
 SCHEME = "MidPoint"
 DIM = 2
 TRUNC = 1
@@ -23,7 +23,7 @@ def main():
     Sys = Systeme(DIM,TRUNC,FUNC1,FUNC2,SCHEME,RAND)
     Sys.init_param_weak_err(Y0,T,LH)
     # On crée le modèle pour fapp 
-    models1 = create_models(Sys.DIM,Sys.FUNC1,Sys.TRUNC)
+    models1 = create_models(Sys.Dim,Sys.func1,Sys.trunc)
     
     y0_train, h_train, input2_train, Ey_train, Vy_train = create_dataset(NB_POINT_TRAIN,Sys,Sys.Dim)
     training_set = [y0_train,h_train,input2_train, Ey_train, Vy_train]
